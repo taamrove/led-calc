@@ -121,7 +121,8 @@
   }
   .grid-cell:hover { outline: 2px solid #fff; outline-offset: -2px; z-index: 1; }
   .grid-cell .cell-label { position: absolute; top: 2px; left: 3px; font-size: 8px; color: rgba(255,255,255,0.3); }
-  .grid-cell .cell-port { font-size: 10px; font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+  .grid-cell .cell-port-id { position: absolute; top: 2px; right: 3px; font-size: 7px; color: rgba(255,255,255,0.5); font-weight: 600; }
+  .grid-cell .cell-port { font-size: 14px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
   .grid-cell .cell-power { position: absolute; bottom: 1px; right: 2px; font-size: 7px; font-weight: 600; color: rgba(255,255,255,0.9); text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
   .stat { display: flex; align-items: center; gap: 6px; }
   .stat-value { font-weight: 600; font-size: 14px; }
@@ -286,7 +287,7 @@
         <button class="small secondary" onclick="showControllerForm()" style="font-size:10px">Custom</button>
       </div>
       <div class="preset-grid">
-        <button class="preset-btn" onclick="quickAddController('MCTRL4K')">MCTRL4K<span>4 ports</span></button>
+        <button class="preset-btn" onclick="quickAddController('MCTRL4K')">MCTRL4K<span>10 ports</span></button>
         <button class="preset-btn" onclick="quickAddController('MCTRL660')">MCTRL660<span>2 ports</span></button>
         <button class="preset-btn" onclick="quickAddController('VX4S')">VX4S<span>4 ports</span></button>
         <button class="preset-btn" onclick="quickAddController('VX6S')">VX6S<span>6 ports</span></button>
@@ -433,7 +434,7 @@ const POWER_COLORS = [
 ];
 
 const PRESETS = {
-  'MCTRL4K':  { name:'Novastar MCTRL4K',  ports:4,  pixPerPort:2300000 },
+  'MCTRL4K':  { name:'Novastar MCTRL4K',  ports:10, pixPerPort:2300000 },
   'MCTRL660': { name:'Novastar MCTRL660',  ports:2,  pixPerPort:1300000 },
   'MCTRL300': { name:'Novastar MCTRL300',  ports:1,  pixPerPort:650000  },
   'VX4S':     { name:'Novastar VX4S',      ports:4,  pixPerPort:2300000 },
@@ -641,7 +642,7 @@ function renderGrid() {
       td.className = 'grid-cell';
       td.dataset.row = r;
       td.dataset.col = c;
-      td.innerHTML = `<span class="cell-label">${r + 1},${c + 1}</span><span class="cell-port"></span><span class="cell-power"></span>`;
+      td.innerHTML = `<span class="cell-label">${r + 1},${c + 1}</span><span class="cell-port-id"></span><span class="cell-port"></span><span class="cell-power"></span>`;
       td.addEventListener('mousedown', (e) => { state.isPainting = true; paintCell(r, c); e.preventDefault(); });
       td.addEventListener('mouseenter', (e) => { if (state.isPainting) paintCell(r, c); showTooltip(e, r, c); });
       td.addEventListener('mouseleave', () => hideTooltip());
@@ -652,6 +653,19 @@ function renderGrid() {
   colorizeGrid();
 }
 
+function getNextSequence(controllerId, portIndex) {
+  if (!state.screen) return 1;
+  const { rows, cols, grid } = state.screen;
+  let maxSeq = 0;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      const s = grid[r][c].signal;
+      if (s && s.controllerId === controllerId && s.portIndex === portIndex && s.sequence)
+        maxSeq = Math.max(maxSeq, s.sequence);
+    }
+  return maxSeq + 1;
+}
+
 function paintCell(r, c) {
   if (!state.screen) return;
   const cell = state.screen.grid[r][c];
@@ -659,7 +673,11 @@ function paintCell(r, c) {
     cell.signal = null;
     cell.power = null;
   } else if (state.paintMode === 'signal' && state.activeBrush && state.activeBrush.type === 'signal') {
-    cell.signal = { controllerId: state.activeBrush.controllerId, portIndex: state.activeBrush.portIndex };
+    const { controllerId, portIndex } = state.activeBrush;
+    const alreadySamePort = cell.signal && cell.signal.controllerId === controllerId && cell.signal.portIndex === portIndex;
+    if (!alreadySamePort) {
+      cell.signal = { controllerId, portIndex, sequence: getNextSequence(controllerId, portIndex) };
+    }
   } else if (state.paintMode === 'power' && state.activeBrush && state.activeBrush.type === 'power') {
     cell.power = { circuitId: state.activeBrush.circuitId };
   }
@@ -710,7 +728,8 @@ function colorizeCell(r, c) {
     td.style.borderWidth = '1px';
   }
   td.style.backgroundColor = bg;
-  td.querySelector('.cell-port').textContent = portLabel;
+  td.querySelector('.cell-port-id').textContent = portLabel;
+  td.querySelector('.cell-port').textContent = (cell.signal && cell.signal.sequence != null) ? String(cell.signal.sequence) : '';
   td.querySelector('.cell-power').textContent = powerLabel;
 }
 
@@ -726,7 +745,9 @@ function showTooltip(e, r, c) {
   html += `Power: ${panel.power}W | Weight: ${panel.weight||0}kg<br>`;
   if (cell.signal) {
     const ctrl = state.controllers.find(ct => ct.id === cell.signal.controllerId);
-    html += `<br><strong>Signal:</strong> ${ctrl ? esc(ctrl.name) : '?'} Port ${cell.signal.portIndex + 1}`;
+    const portPanels = getPortPanelList(cell.signal.controllerId, cell.signal.portIndex);
+    const seqInfo = cell.signal.sequence != null ? ` — cable #${cell.signal.sequence} of ${portPanels.length}` : '';
+    html += `<br><strong>Signal:</strong> ${ctrl ? esc(ctrl.name) : '?'} Port ${cell.signal.portIndex + 1}${seqInfo}`;
   } else {
     html += `<br><em>No signal assigned</em>`;
   }
@@ -850,9 +871,12 @@ function getPortPanelList(controllerId, portIndex) {
   const panels = [];
   const { rows, cols, grid } = state.screen;
   for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++)
-      if (grid[r][c].signal && grid[r][c].signal.controllerId === controllerId && grid[r][c].signal.portIndex === portIndex)
-        panels.push({ r: r + 1, c: c + 1 });
+    for (let c = 0; c < cols; c++) {
+      const s = grid[r][c].signal;
+      if (s && s.controllerId === controllerId && s.portIndex === portIndex)
+        panels.push({ r: r + 1, c: c + 1, seq: s.sequence || 0 });
+    }
+  panels.sort((a, b) => a.seq - b.seq);
   return panels;
 }
 
@@ -1214,7 +1238,7 @@ function renderReport() {
       totalCtrlPix += usage;
       const panels = getPortPanelList(ctrl.id, i);
       const pct = ctrl.pixPerPort > 0 ? (usage / ctrl.pixPerPort * 100).toFixed(1) : 0;
-      const panelStr = panels.length > 0 ? panels.map(p => `${p.r},${p.c}`).join(' | ') : '—';
+      const panelStr = panels.length > 0 ? panels.map(p => `${p.r},${p.c}`).join(' → ') : '—';
       const overCap = usage > ctrl.pixPerPort;
       tableRows += `<tr>
         <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${ctrl.portColors[i]};vertical-align:middle;margin-right:4px;print-color-adjust:exact;-webkit-print-color-adjust:exact"></span>Port ${i + 1}</td>
@@ -1228,7 +1252,7 @@ function renderReport() {
     const totalPct = ctrl.maxPixels > 0 ? (totalCtrlPix / ctrl.maxPixels * 100).toFixed(1) : 0;
     html += `<table class="report-table">
       <thead><tr><th colspan="6">${esc(ctrl.name)} — ${totalCtrlPix.toLocaleString()} / ${ctrl.maxPixels.toLocaleString()} px total (${totalPct}%)</th></tr>
-      <tr><th>Port</th><th>Panels</th><th>Pixels Used</th><th>Capacity</th><th>Load</th><th>Panel Positions (row,col)</th></tr></thead>
+      <tr><th>Port</th><th>Panels</th><th>Pixels Used</th><th>Capacity</th><th>Load</th><th>Wiring Order (daisy-chain)</th></tr></thead>
       <tbody>${tableRows}</tbody>
     </table>`;
   });

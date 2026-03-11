@@ -312,9 +312,12 @@
     <div class="section">
       <div class="section-title">
         <span>Power Circuits</span>
-        <button class="small" onclick="showPowerForm()">+ Add</button>
+        <button class="small" onclick="quickAddPowerCircuit()">+ Add</button>
+        <button class="small secondary" onclick="showPowerForm()" style="margin-left:4px">Custom</button>
       </div>
       <div id="powerForm" style="display:none">
+        <label>Name (optional)</label>
+        <input id="pwrName" placeholder="auto-numbered if blank">
         <div class="row">
           <div><label>Breaker (A)</label><input id="pwrAmps" type="number" value="16"></div>
           <div><label>Voltage (V)</label><input id="pwrVolts" type="number" value="230"></div>
@@ -340,9 +343,9 @@
       <div style="flex:1"></div>
       <div id="paintControls" style="display:flex;gap:8px;align-items:center;">
         <span style="font-size:12px;color:var(--text-dim)">Mode:</span>
-        <button class="small" id="btnSignal" onclick="setPaintMode('signal')" style="background:var(--accent2)">Signal</button>
-        <button class="small secondary" id="btnPower" onclick="setPaintMode('power')">Power</button>
-        <button class="small secondary" id="btnErase" onclick="setPaintMode('erase')">Eraser</button>
+        <button class="small" id="btnSignal" onclick="setPaintMode('signal')" style="background:var(--accent2)" title="Signal mode (S)">Signal <kbd style="font-size:9px;opacity:0.7;background:rgba(0,0,0,0.3);border-radius:2px;padding:0 3px">S</kbd></button>
+        <button class="small secondary" id="btnPower" onclick="setPaintMode('power')" title="Power mode (P)">Power <kbd style="font-size:9px;opacity:0.7;background:rgba(0,0,0,0.3);border-radius:2px;padding:0 3px">P</kbd></button>
+        <button class="small secondary" id="btnErase" onclick="setPaintMode('erase')" title="Eraser mode (E)">Erase <kbd style="font-size:9px;opacity:0.7;background:rgba(0,0,0,0.3);border-radius:2px;padding:0 3px">E</kbd></button>
         <div style="width:1px;height:20px;background:var(--border)"></div>
         <div id="activeBrushInfo" style="font-size:12px;color:var(--text-dim)">Select a port or circuit to paint</div>
       </div>
@@ -356,7 +359,13 @@
       <div class="canvas-area" id="canvasArea">
         <div class="empty-state" id="emptyState">
           <h3>No Screen Built</h3>
-          <p>Define a panel type, set your screen dimensions, and click "Build Screen" to get started.</p>
+          <p style="margin-bottom:16px">Follow these steps in the sidebar to get started:</p>
+          <ol style="text-align:left;display:inline-block;line-height:2;font-size:13px">
+            <li><strong>LED Panel Types</strong> — add or select a panel</li>
+            <li><strong>Screen Configuration</strong> — set dimensions, click Build</li>
+            <li><strong>Controllers</strong> — add a controller, click a port to paint signal</li>
+            <li><strong>Power Circuits</strong> — add circuits, click one to paint power</li>
+          </ol>
         </div>
         <div id="gridWrapper" style="display:none">
           <div id="screenLabel" style="font-size:13px;color:var(--text-dim);margin-bottom:8px"></div>
@@ -436,8 +445,10 @@ const PRESETS = {
 // Built-in panel library — ships with the app, always available.
 // Users can add custom panels on top of these.
 const PANEL_LIBRARY = [
-  // Add your commonly used panels here. These are just examples to get started.
-  // { name:'ROE BP2V2', pixW:256, pixH:128, pitch:2.84, power:180, width:500, height:500, weight:7.5 },
+  { name:'ROE BP2V2',     pixW:256, pixH:128, pitch:2.84,  power:180, width:500, height:500, weight:7.5 },
+  { name:'ROE CB5',       pixW:160, pixH:160, pitch:5,     power:150, width:500, height:500, weight:5.8 },
+  { name:'Absen A3',      pixW:240, pixH:270, pitch:3.125, power:300, width:750, height:843, weight:15  },
+  { name:'Unilumin U2.9', pixW:192, pixH:192, pitch:2.976, power:220, width:576, height:576, weight:8   },
 ];
 
 // ============================================================
@@ -741,7 +752,11 @@ function hideTooltip() { document.getElementById('tooltip').style.display = 'non
 // ============================================================
 // CONTROLLER MANAGEMENT
 // ============================================================
-function showControllerForm() { document.getElementById('controllerForm').style.display = 'block'; }
+function showControllerForm() {
+  document.getElementById('controllerForm').style.display = 'block';
+  const sel = document.getElementById('ctrlPreset');
+  if (sel.value) applyControllerPreset();
+}
 function hideControllerForm() {
   document.getElementById('controllerForm').style.display = 'none';
   document.getElementById('ctrlPreset').value = '';
@@ -873,14 +888,24 @@ function selectSignalBrush(controllerId, portIndex) {
 function showPowerForm() { document.getElementById('powerForm').style.display = 'block'; }
 function hidePowerForm() { document.getElementById('powerForm').style.display = 'none'; }
 
+function quickAddPowerCircuit() {
+  const num = state.powerCircuits.length + 1;
+  const colorIdx = state.powerCircuits.length % POWER_COLORS.length;
+  state.powerCircuits.push({ id: gid(), name: String(num), amps: 16, volts: 230, color: POWER_COLORS[colorIdx] });
+  renderPowerList();
+  saveState();
+}
+
 function savePowerCircuit() {
+  const customName = document.getElementById('pwrName').value.trim();
   const amps = parseFloat(document.getElementById('pwrAmps').value);
   const volts = parseFloat(document.getElementById('pwrVolts').value);
   if (!amps || !volts) { alert('Fill in amps and volts.'); return; }
   const num = state.powerCircuits.length + 1;
-  const name = String(num);
+  const name = customName || String(num);
   const colorIdx = state.powerCircuits.length % POWER_COLORS.length;
   state.powerCircuits.push({ id: gid(), name, amps, volts, color: POWER_COLORS[colorIdx] });
+  document.getElementById('pwrName').value = '';
   hidePowerForm();
   renderPowerList();
   saveState();
@@ -1422,6 +1447,16 @@ function esc(s) {
   d.textContent = s;
   return d.innerHTML;
 }
+
+// ============================================================
+// KEYBOARD SHORTCUTS
+// ============================================================
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 's' || e.key === 'S') setPaintMode('signal');
+  if (e.key === 'p' || e.key === 'P') setPaintMode('power');
+  if (e.key === 'e' || e.key === 'E') setPaintMode('erase');
+});
 
 // ============================================================
 // INIT

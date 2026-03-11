@@ -86,6 +86,17 @@
   .item-list li.active { border-color: var(--accent); }
   .item-list li .info { color: var(--text-dim); font-size: 11px; }
   .item-list li .actions { display: flex; gap: 4px; }
+  .preset-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px;
+  }
+  .preset-btn {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); padding: 6px 4px; cursor: pointer; font-size: 11px;
+    font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 1px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .preset-btn span { font-weight: 400; color: var(--text-dim); font-size: 10px; }
+  .preset-btn:hover { background: var(--accent2); border-color: var(--accent2); }
   .port-list { list-style: none; margin-top: 6px; }
   .port-list li {
     display: flex; align-items: center; gap: 6px;
@@ -272,36 +283,27 @@
     <div class="section">
       <div class="section-title">
         <span>Controllers</span>
-        <button class="small" onclick="showControllerForm()">+ Add</button>
+        <button class="small secondary" onclick="showControllerForm()" style="font-size:10px">Custom</button>
+      </div>
+      <div class="preset-grid">
+        <button class="preset-btn" onclick="quickAddController('MCTRL4K')">MCTRL4K<span>4 ports</span></button>
+        <button class="preset-btn" onclick="quickAddController('MCTRL660')">MCTRL660<span>2 ports</span></button>
+        <button class="preset-btn" onclick="quickAddController('VX4S')">VX4S<span>4 ports</span></button>
+        <button class="preset-btn" onclick="quickAddController('VX6S')">VX6S<span>6 ports</span></button>
+        <button class="preset-btn" onclick="quickAddController('VX1000')">VX1000<span>10 ports</span></button>
+        <button class="preset-btn" onclick="quickAddController('P3-150')">P3-150<span>6 ports</span></button>
+        <button class="preset-btn" onclick="quickAddController('P3-300')">P3-300<span>12 ports</span></button>
+        <button class="preset-btn" onclick="quickAddController('MCTRL300')">MCTRL300<span>1 port</span></button>
       </div>
       <div id="controllerForm" style="display:none">
-        <label>Controller Type</label>
-        <select id="ctrlPreset" onchange="applyControllerPreset()">
-          <option value="">Custom...</option>
-          <optgroup label="Novastar">
-            <option value="MCTRL4K">Novastar MCTRL4K</option>
-            <option value="MCTRL660">Novastar MCTRL660</option>
-            <option value="MCTRL300">Novastar MCTRL300</option>
-            <option value="VX4S">Novastar VX4S</option>
-            <option value="VX6S">Novastar VX6S</option>
-            <option value="VX1000">Novastar VX1000</option>
-          </optgroup>
-          <optgroup label="Martin / P3">
-            <option value="P3-050">Martin P3-050</option>
-            <option value="P3-150">Martin P3-150</option>
-            <option value="P3-300">Martin P3-300</option>
-          </optgroup>
-        </select>
         <label>Name / Label</label>
         <input id="ctrlName" placeholder="e.g. Controller A">
         <div class="row">
-          <div><label>Ports</label><input id="ctrlPorts" type="number" value="4" min="1" max="20"></div>
-          <div><label>Max pixels/port</label><input id="ctrlPixPerPort" type="number" value="650000"></div>
+          <div><label>Ports</label><input id="ctrlPorts" type="number" value="4" min="1" max="32"></div>
+          <div><label>Pixels/port</label><input id="ctrlPixPerPort" type="number" value="650000"></div>
         </div>
-        <label>Total max pixels</label>
-        <input id="ctrlMaxPix" type="number" value="2300000">
         <div class="form-actions">
-          <button onclick="saveController()">Add Controller</button>
+          <button onclick="saveController()">Add</button>
           <button class="secondary" onclick="hideControllerForm()">Cancel</button>
         </div>
       </div>
@@ -431,25 +433,18 @@ const POWER_COLORS = [
 ];
 
 const PRESETS = {
-  'MCTRL4K':  { name:'Novastar MCTRL4K',  ports:4,  pixPerPort:2300000, maxPixels:4096*2160 },
-  'MCTRL660': { name:'Novastar MCTRL660',  ports:2,  pixPerPort:1300000, maxPixels:2048*1280 },
-  'MCTRL300': { name:'Novastar MCTRL300',  ports:1,  pixPerPort:650000,  maxPixels:650000 },
-  'VX4S':     { name:'Novastar VX4S',      ports:4,  pixPerPort:2300000, maxPixels:4096*2160 },
-  'VX6S':     { name:'Novastar VX6S',      ports:6,  pixPerPort:2300000, maxPixels:4096*2160 },
-  'VX1000':   { name:'Novastar VX1000',    ports:10, pixPerPort:2300000, maxPixels:10400000 },
-  'P3-050':   { name:'Martin P3-050',      ports:2,  pixPerPort:327680,  maxPixels:655360 },
-  'P3-150':   { name:'Martin P3-150',      ports:6,  pixPerPort:327680,  maxPixels:1966080 },
-  'P3-300':   { name:'Martin P3-300',      ports:12, pixPerPort:327680,  maxPixels:3932160 },
+  'MCTRL4K':  { name:'Novastar MCTRL4K',  ports:4,  pixPerPort:2300000 },
+  'MCTRL660': { name:'Novastar MCTRL660',  ports:2,  pixPerPort:1300000 },
+  'MCTRL300': { name:'Novastar MCTRL300',  ports:1,  pixPerPort:650000  },
+  'VX4S':     { name:'Novastar VX4S',      ports:4,  pixPerPort:2300000 },
+  'VX6S':     { name:'Novastar VX6S',      ports:6,  pixPerPort:2300000 },
+  'VX1000':   { name:'Novastar VX1000',    ports:10, pixPerPort:2300000 },
+  'P3-050':   { name:'Martin P3-050',      ports:2,  pixPerPort:327680  },
+  'P3-150':   { name:'Martin P3-150',      ports:6,  pixPerPort:327680  },
+  'P3-300':   { name:'Martin P3-300',      ports:12, pixPerPort:327680  },
 };
 
-// Built-in panel library — ships with the app, always available.
-// Users can add custom panels on top of these.
-const PANEL_LIBRARY = [
-  { name:'ROE BP2V2',     pixW:256, pixH:128, pitch:2.84,  power:180, width:500, height:500, weight:7.5 },
-  { name:'ROE CB5',       pixW:160, pixH:160, pitch:5,     power:150, width:500, height:500, weight:5.8 },
-  { name:'Absen A3',      pixW:240, pixH:270, pitch:3.125, power:300, width:750, height:843, weight:15  },
-  { name:'Unilumin U2.9', pixW:192, pixH:192, pitch:2.976, power:220, width:576, height:576, weight:8   },
-];
+const PANEL_LIBRARY = [];
 
 // ============================================================
 // IMPORT / EXPORT
@@ -752,37 +747,36 @@ function hideTooltip() { document.getElementById('tooltip').style.display = 'non
 // ============================================================
 // CONTROLLER MANAGEMENT
 // ============================================================
+function quickAddController(presetKey) {
+  const p = PRESETS[presetKey];
+  const colorOffset = state.controllers.reduce((sum, c) => sum + c.ports, 0);
+  const portColors = [];
+  for (let i = 0; i < p.ports; i++) portColors.push(SIGNAL_COLORS[(colorOffset + i) % SIGNAL_COLORS.length]);
+  const samePreset = state.controllers.filter(c => c.preset === presetKey).length;
+  const name = samePreset === 0 ? p.name : `${p.name} ${samePreset + 1}`;
+  state.controllers.push({ id: gid(), name, preset: presetKey, ports: p.ports, pixPerPort: p.pixPerPort, maxPixels: p.ports * p.pixPerPort, portColors });
+  renderControllerList();
+  saveState();
+}
+
 function showControllerForm() {
-  document.getElementById('controllerForm').style.display = 'block';
-  const sel = document.getElementById('ctrlPreset');
-  if (sel.value) applyControllerPreset();
+  const form = document.getElementById('controllerForm');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
 }
 function hideControllerForm() {
   document.getElementById('controllerForm').style.display = 'none';
-  document.getElementById('ctrlPreset').value = '';
   document.getElementById('ctrlName').value = '';
-}
-
-function applyControllerPreset() {
-  const key = document.getElementById('ctrlPreset').value;
-  if (!key) return;
-  const p = PRESETS[key];
-  document.getElementById('ctrlName').value = p.name;
-  document.getElementById('ctrlPorts').value = p.ports;
-  document.getElementById('ctrlPixPerPort').value = p.pixPerPort;
-  document.getElementById('ctrlMaxPix').value = p.maxPixels;
 }
 
 function saveController() {
   const name = document.getElementById('ctrlName').value.trim();
   const ports = parseInt(document.getElementById('ctrlPorts').value);
   const pixPerPort = parseInt(document.getElementById('ctrlPixPerPort').value);
-  const maxPixels = parseInt(document.getElementById('ctrlMaxPix').value);
-  if (!name || !ports) { alert('Name and port count required.'); return; }
+  if (!name || !ports || !pixPerPort) { alert('Fill in all fields.'); return; }
   const colorOffset = state.controllers.reduce((sum, c) => sum + c.ports, 0);
   const portColors = [];
   for (let i = 0; i < ports; i++) portColors.push(SIGNAL_COLORS[(colorOffset + i) % SIGNAL_COLORS.length]);
-  state.controllers.push({ id: gid(), name, preset: document.getElementById('ctrlPreset').value, ports, pixPerPort, maxPixels, portColors });
+  state.controllers.push({ id: gid(), name, preset: '', ports, pixPerPort, maxPixels: ports * pixPerPort, portColors });
   hideControllerForm();
   renderControllerList();
   saveState();
@@ -1410,39 +1404,18 @@ function saveState() {
 function loadState() {
   try {
     const raw = localStorage.getItem('led-wiring-planner');
-    if (raw) {
-      const s = JSON.parse(raw);
-      state.panels = s.panels || [];
-      state.controllers = s.controllers || [];
-      state.powerCircuits = s.powerCircuits || [];
-      state.screen = s.screen || null;
-      if (s.nextId) nextId = s.nextId;
-      else nextId = Math.max(1,
-        ...state.panels.map(p => p.id + 1),
-        ...state.controllers.map(c => c.id + 1),
-        ...state.powerCircuits.map(p => p.id + 1)
-      );
-      // Seed library panels if none exist yet (handles existing localStorage with no panels)
-      if (state.panels.length === 0) {
-        PANEL_LIBRARY.forEach(lib => {
-          state.panels.push({ id: gid(), ...lib, _library: true });
-        });
-        saveState();
-      }
-    } else {
-      // First load — seed from built-in library
-      PANEL_LIBRARY.forEach(lib => {
-        state.panels.push({ id: gid(), ...lib, _library: true });
-      });
-      // Pre-fill all controller presets
-      Object.entries(PRESETS).forEach(([key, p]) => {
-        const colorOffset = state.controllers.reduce((sum, c) => sum + c.ports, 0);
-        const portColors = [];
-        for (let i = 0; i < p.ports; i++) portColors.push(SIGNAL_COLORS[(colorOffset + i) % SIGNAL_COLORS.length]);
-        state.controllers.push({ id: gid(), name: p.name, preset: key, ports: p.ports, pixPerPort: p.pixPerPort, maxPixels: p.maxPixels, portColors });
-      });
-      saveState();
-    }
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    state.panels = s.panels || [];
+    state.controllers = s.controllers || [];
+    state.powerCircuits = s.powerCircuits || [];
+    state.screen = s.screen || null;
+    if (s.nextId) nextId = s.nextId;
+    else nextId = Math.max(1,
+      ...state.panels.map(p => p.id + 1),
+      ...state.controllers.map(c => c.id + 1),
+      ...state.powerCircuits.map(p => p.id + 1)
+    );
   } catch (e) { /* corrupt data, start fresh */ }
 }
 

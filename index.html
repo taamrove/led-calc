@@ -667,6 +667,19 @@ function getNextSequence(controllerId, portIndex) {
   return maxSeq + 1;
 }
 
+function getNextPowerSequence(circuitId) {
+  if (!state.screen) return 1;
+  const { rows, cols, grid } = state.screen;
+  let maxSeq = 0;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      const p = grid[r][c].power;
+      if (p && p.circuitId === circuitId && p.sequence)
+        maxSeq = Math.max(maxSeq, p.sequence);
+    }
+  return maxSeq + 1;
+}
+
 function paintCell(r, c) {
   if (!state.screen) return;
   const cell = state.screen.grid[r][c];
@@ -680,7 +693,11 @@ function paintCell(r, c) {
       cell.signal = { controllerId, portIndex, sequence: getNextSequence(controllerId, portIndex) };
     }
   } else if (state.paintMode === 'power' && state.activeBrush && state.activeBrush.type === 'power') {
-    cell.power = { circuitId: state.activeBrush.circuitId };
+    const { circuitId } = state.activeBrush;
+    const alreadySameCircuit = cell.power && cell.power.circuitId === circuitId;
+    if (!alreadySameCircuit) {
+      cell.power = { circuitId, sequence: getNextPowerSequence(circuitId) };
+    }
   }
   colorizeCell(r, c);
   drawWiringArrows();
@@ -709,25 +726,35 @@ function drawWiringArrows() {
   const table = document.getElementById('gridTable');
   const defs = '<defs><marker id="wArrow" markerWidth="5" markerHeight="3.5" refX="4" refY="1.75" orient="auto"><polygon points="0 0, 5 1.75, 0 3.5" fill="rgba(0,0,0,0.7)" /></marker></defs>';
   let paths = '';
-  state.controllers.forEach(ctrl => {
-    for (let pi = 0; pi < ctrl.ports; pi++) {
-      const panels = getPortPanelList(ctrl.id, pi);
-      if (panels.length < 2) continue;
-      for (let i = 0; i < panels.length - 1; i++) {
-        const a = panels[i], b = panels[i + 1];
-        const row_a = table.rows[a.r - 1], row_b = table.rows[b.r - 1];
-        if (!row_a || !row_b) continue;
-        const tdA = row_a.cells[a.c - 1], tdB = row_b.cells[b.c - 1];
-        if (!tdA || !tdB) continue;
-        const rA = tdA.getBoundingClientRect(), rB = tdB.getBoundingClientRect();
-        const x1 = (rA.left - containerRect.left + rA.width / 2).toFixed(1);
-        const y1 = (rA.top - containerRect.top + rA.height / 2).toFixed(1);
-        const x2 = (rB.left - containerRect.left + rB.width / 2).toFixed(1);
-        const y2 = (rB.top - containerRect.top + rB.height / 2).toFixed(1);
-        paths += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(255,255,255,0.85)" stroke-width="2" marker-end="url(#wArrow)" />`;
+
+  function arrowLine(a, b, strokeColor) {
+    const row_a = table.rows[a.r - 1], row_b = table.rows[b.r - 1];
+    if (!row_a || !row_b) return '';
+    const tdA = row_a.cells[a.c - 1], tdB = row_b.cells[b.c - 1];
+    if (!tdA || !tdB) return '';
+    const rA = tdA.getBoundingClientRect(), rB = tdB.getBoundingClientRect();
+    const x1 = (rA.left - containerRect.left + rA.width / 2).toFixed(1);
+    const y1 = (rA.top - containerRect.top + rA.height / 2).toFixed(1);
+    const x2 = (rB.left - containerRect.left + rB.width / 2).toFixed(1);
+    const y2 = (rB.top - containerRect.top + rB.height / 2).toFixed(1);
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${strokeColor}" stroke-width="2" marker-end="url(#wArrow)" />`;
+  }
+
+  if (state.paintMode === 'power') {
+    state.powerCircuits.forEach(circ => {
+      const panels = getCircuitPanelList(circ.id);
+      for (let i = 0; i < panels.length - 1; i++)
+        paths += arrowLine(panels[i], panels[i + 1], 'rgba(255,220,50,0.9)');
+    });
+  } else {
+    state.controllers.forEach(ctrl => {
+      for (let pi = 0; pi < ctrl.ports; pi++) {
+        const panels = getPortPanelList(ctrl.id, pi);
+        for (let i = 0; i < panels.length - 1; i++)
+          paths += arrowLine(panels[i], panels[i + 1], 'rgba(255,255,255,0.85)');
       }
-    }
-  });
+    });
+  }
   svg.innerHTML = defs + paths;
 }
 
@@ -749,7 +776,7 @@ function colorizeCell(r, c) {
   if (cell.power) {
     const circ = state.powerCircuits.find(p => p.id === cell.power.circuitId);
     if (circ) {
-      powerLabel = circ.name;
+      powerLabel = cell.power.sequence != null ? String(cell.power.sequence) : circ.name;
       if (!cell.signal) bg = circ.color;
     }
   }
@@ -919,9 +946,12 @@ function getCircuitPanelList(circuitId) {
   const panels = [];
   const { rows, cols, grid } = state.screen;
   for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++)
-      if (grid[r][c].power && grid[r][c].power.circuitId === circuitId)
-        panels.push({ r: r + 1, c: c + 1 });
+    for (let c = 0; c < cols; c++) {
+      const p = grid[r][c].power;
+      if (p && p.circuitId === circuitId)
+        panels.push({ r: r + 1, c: c + 1, seq: p.sequence || 0 });
+    }
+  panels.sort((a, b) => a.seq - b.seq);
   return panels;
 }
 
@@ -932,6 +962,7 @@ function selectSignalBrush(controllerId, portIndex) {
   updateBrushInfo();
   renderControllerList();
   renderPowerList();
+  drawWiringArrows();
 }
 
 // ============================================================
@@ -1025,6 +1056,7 @@ function selectPowerBrush(circuitId) {
   updateBrushInfo();
   renderControllerList();
   renderPowerList();
+  drawWiringArrows();
 }
 
 // ============================================================
@@ -1041,6 +1073,7 @@ function setPaintMode(mode) {
   updateBrushInfo();
   const container = document.getElementById('gridContainer');
   if (container) container.className = mode === 'erase' ? 'grid-container eraser-active' : 'grid-container';
+  drawWiringArrows();
 }
 
 function updatePaintModeButtons() {
@@ -1371,7 +1404,7 @@ function renderReport() {
       const pct = capacity > 0 ? (usage / capacity * 100).toFixed(1) : 0;
       const ampsDraw = circ.volts > 0 ? (usage / circ.volts).toFixed(1) : '0';
       const panels = getCircuitPanelList(circ.id);
-      const panelStr = panels.length > 0 ? panels.map(p => `${p.r},${p.c}`).join(' | ') : '—';
+      const panelStr = panels.length > 0 ? panels.map(p => `${p.r},${p.c}`).join(' → ') : '—';
       const overCap = usage > capacity;
       powerTableRows += `<tr>
         <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${circ.color};vertical-align:middle;margin-right:4px;print-color-adjust:exact;-webkit-print-color-adjust:exact"></span>${esc(circ.name)}</td>
@@ -1385,7 +1418,7 @@ function renderReport() {
     });
     html += `<table class="report-table">
       <thead><tr><th colspan="7">Power Distribution — ${totalPowerDraw.toLocaleString()} W total draw</th></tr>
-      <tr><th>Circuit</th><th>Panels</th><th>Power Draw</th><th>Capacity</th><th>Current</th><th>Load</th><th>Panel Positions (row,col)</th></tr></thead>
+      <tr><th>Circuit</th><th>Panels</th><th>Power Draw</th><th>Capacity</th><th>Current</th><th>Load</th><th>Wiring Order (daisy-chain)</th></tr></thead>
       <tbody>${powerTableRows}</tbody>
     </table>`;
   } else {

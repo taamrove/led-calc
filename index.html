@@ -1401,6 +1401,14 @@ function loadState() {
       PANEL_LIBRARY.forEach(lib => {
         state.panels.push({ id: gid(), ...lib, _library: true });
       });
+      // Pre-fill all controller presets
+      Object.entries(PRESETS).forEach(([key, p]) => {
+        const colorOffset = state.controllers.reduce((sum, c) => sum + c.ports, 0);
+        const portColors = [];
+        for (let i = 0; i < p.ports; i++) portColors.push(SIGNAL_COLORS[(colorOffset + i) % SIGNAL_COLORS.length]);
+        state.controllers.push({ id: gid(), name: p.name, preset: key, ports: p.ports, pixPerPort: p.pixPerPort, maxPixels: p.maxPixels, portColors });
+      });
+      saveState();
     }
   } catch (e) { /* corrupt data, start fresh */ }
 }

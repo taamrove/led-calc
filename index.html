@@ -315,8 +315,6 @@
         <button class="small" onclick="showPowerForm()">+ Add</button>
       </div>
       <div id="powerForm" style="display:none">
-        <label>Circuit Label</label>
-        <input id="pwrName" placeholder="e.g. Circuit A1">
         <div class="row">
           <div><label>Breaker (A)</label><input id="pwrAmps" type="number" value="16"></div>
           <div><label>Voltage (V)</label><input id="pwrVolts" type="number" value="230"></div>
@@ -686,13 +684,14 @@ function colorizeCell(r, c) {
     const ctrl = state.controllers.find(ct => ct.id === cell.signal.controllerId);
     if (ctrl) {
       bg = ctrl.portColors[cell.signal.portIndex] || '#555';
-      portLabel = `${ctrl.name.substring(0, 6)}:${cell.signal.portIndex + 1}`;
+      const ctrlIdx = state.controllers.indexOf(ctrl) + 1;
+      portLabel = `C${ctrlIdx}:P${cell.signal.portIndex + 1}`;
     }
   }
   if (cell.power) {
     const circ = state.powerCircuits.find(p => p.id === cell.power.circuitId);
     if (circ) {
-      powerLabel = circ.name.substring(0, 6);
+      powerLabel = circ.name;
       if (!cell.signal) bg = circ.color;
     }
   }
@@ -875,10 +874,11 @@ function showPowerForm() { document.getElementById('powerForm').style.display = 
 function hidePowerForm() { document.getElementById('powerForm').style.display = 'none'; }
 
 function savePowerCircuit() {
-  const name = document.getElementById('pwrName').value.trim();
   const amps = parseFloat(document.getElementById('pwrAmps').value);
   const volts = parseFloat(document.getElementById('pwrVolts').value);
-  if (!name || !amps || !volts) { alert('Fill in all fields.'); return; }
+  if (!amps || !volts) { alert('Fill in amps and volts.'); return; }
+  const num = state.powerCircuits.length + 1;
+  const name = String(num);
   const colorIdx = state.powerCircuits.length % POWER_COLORS.length;
   state.powerCircuits.push({ id: gid(), name, amps, volts, color: POWER_COLORS[colorIdx] });
   hidePowerForm();
@@ -1164,7 +1164,8 @@ function renderReport() {
         const ctrl = state.controllers.find(ct => ct.id === cell.signal.controllerId);
         if (ctrl) {
           bg = ctrl.portColors[cell.signal.portIndex] || '#555';
-          label = `P${cell.signal.portIndex + 1}`;
+          const ctrlIdx = state.controllers.indexOf(ctrl) + 1;
+          label = `C${ctrlIdx}:P${cell.signal.portIndex + 1}`;
         }
       }
       html += `<td class="report-cell" style="background:${bg};print-color-adjust:exact;-webkit-print-color-adjust:exact">${label}</td>`;
@@ -1175,11 +1176,11 @@ function renderReport() {
 
   // Signal legend
   html += '<div class="report-legend">';
-  state.controllers.forEach(ctrl => {
+  state.controllers.forEach((ctrl, ci) => {
     for (let i = 0; i < ctrl.ports; i++) {
       const usage = getPortUsage(ctrl.id, i);
       if (usage > 0) {
-        html += `<div class="report-legend-item"><span class="report-legend-swatch" style="background:${ctrl.portColors[i]};print-color-adjust:exact;-webkit-print-color-adjust:exact"></span>${esc(ctrl.name)} P${i + 1}</div>`;
+        html += `<div class="report-legend-item"><span class="report-legend-swatch" style="background:${ctrl.portColors[i]};print-color-adjust:exact;-webkit-print-color-adjust:exact"></span>C${ci + 1}:P${i + 1} — ${esc(ctrl.name)}</div>`;
       }
     }
   });
@@ -1264,7 +1265,7 @@ function renderReport() {
         const circ = state.powerCircuits.find(p => p.id === cell.power.circuitId);
         if (circ) {
           bg = circ.color;
-          label = circ.name.substring(0, 4);
+          label = circ.name;
         }
       }
       html += `<td class="report-cell" style="background:${bg};color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact">${label}</td>`;
@@ -1276,7 +1277,7 @@ function renderReport() {
   // Power legend
   html += '<div class="report-legend">';
   state.powerCircuits.forEach(circ => {
-    html += `<div class="report-legend-item"><span class="report-legend-swatch" style="background:${circ.color};print-color-adjust:exact;-webkit-print-color-adjust:exact"></span>${esc(circ.name)} (${circ.amps}A / ${circ.volts}V)</div>`;
+    html += `<div class="report-legend-item"><span class="report-legend-swatch" style="background:${circ.color};print-color-adjust:exact;-webkit-print-color-adjust:exact"></span>Circuit ${esc(circ.name)} (${circ.amps}A / ${circ.volts}V)</div>`;
   });
   html += '</div>';
 

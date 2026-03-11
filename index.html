@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LED Screen Wiring Planner</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --bg2: #16213e;
+    --bg3: #0f3460;
+    --accent: #e94560;
+    --accent2: #533483;
+    --text: #eee;
+    --text-dim: #999;
+    --border: #334;
+    --success: #4caf50;
+    --warning: #ff9800;
+    --danger: #f44336;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .app { display: flex; height: 100vh; }
+  .sidebar {
+    width: 340px; min-width: 340px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .toolbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .canvas-area { flex: 1; overflow: auto; padding: 20px; position: relative; }
+  .stats-bar {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px;
+  }
+  .section { border-bottom: 1px solid var(--border); padding: 14px; }
+  .section-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text-dim); margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .section-title button { font-size: 11px; padding: 2px 8px; }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 3px; margin-top: 8px; }
+  label:first-child { margin-top: 0; }
+  input, select {
+    width: 100%; padding: 6px 10px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text); font-size: 13px;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  button {
+    padding: 6px 14px; background: var(--accent); border: none;
+    border-radius: 4px; color: #fff; font-size: 13px; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: var(--bg3); }
+  button.small { padding: 3px 8px; font-size: 11px; }
+  button.danger { background: var(--danger); }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .form-actions { margin-top: 10px; display: flex; gap: 6px; }
+  .item-list { list-style: none; margin-top: 8px; }
+  .item-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 8px; background: var(--bg); border-radius: 4px;
+    margin-bottom: 4px; font-size: 12px; cursor: pointer;
+    border: 2px solid transparent; transition: border-color 0.15s;
+  }
+  .item-list li:hover { border-color: var(--border); }
+  .item-list li.active { border-color: var(--accent); }
+  .item-list li .info { color: var(--text-dim); font-size: 11px; }
+  .item-list li .actions { display: flex; gap: 4px; }
+  .port-list { list-style: none; margin-top: 6px; }
+  .port-list li {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 6px; font-size: 12px; border-radius: 3px;
+    margin-bottom: 2px; cursor: pointer; border: 2px solid transparent;
+  }
+  .port-list li:hover { background: rgba(255,255,255,0.05); }
+  .port-list li.selected { border-color: var(--accent); background: rgba(233,69,96,0.1); }
+  .port-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+  .port-bar { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+  .port-bar-fill { height: 100%; border-radius: 3px; transition: width 0.2s; }
+  .grid-container {
+    display: inline-block; border: 2px solid var(--border);
+    border-radius: 4px; background: #111; position: relative;
+  }
+  .grid-table { border-collapse: collapse; }
+  .grid-cell {
+    width: 44px; height: 44px; border: 1px solid #222;
+    text-align: center; font-size: 9px; color: rgba(255,255,255,0.6);
+    cursor: crosshair; user-select: none; position: relative;
+    transition: opacity 0.1s;
+  }
+  .grid-cell:hover { outline: 2px solid #fff; outline-offset: -2px; z-index: 1; }
+  .grid-cell .cell-label { position: absolute; top: 2px; left: 3px; font-size: 8px; color: rgba(255,255,255,0.3); }
+  .grid-cell .cell-port { font-size: 10px; font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+  .grid-cell .cell-power { position: absolute; bottom: 1px; right: 2px; font-size: 7px; font-weight: 600; color: rgba(255,255,255,0.9); text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+  .stat { display: flex; align-items: center; gap: 6px; }
+  .stat-value { font-weight: 600; font-size: 14px; }
+  .stat-label { color: var(--text-dim); }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 8px 16px; font-size: 12px; cursor: pointer;
+    border-bottom: 2px solid transparent; color: var(--text-dim);
+    transition: all 0.15s; background: none; border-radius: 0;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .paint-mode {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;
+  }
+  .paint-mode.signal { background: rgba(83,52,131,0.4); border: 1px solid var(--accent2); }
+  .paint-mode.power { background: rgba(255,152,0,0.2); border: 1px solid var(--warning); }
+  .paint-mode.erase { background: rgba(244,67,54,0.2); border: 1px solid var(--danger); }
+  .util-panel { padding: 14px; }
+  .util-card { background: var(--bg); border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+  .util-card h4 { font-size: 13px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .util-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; }
+  .util-row .port-swatch { width: 10px; height: 10px; }
+  .util-bar { flex: 1; height: 8px; background: #222; border-radius: 4px; overflow: hidden; }
+  .util-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+  .util-pct { width: 40px; text-align: right; font-size: 11px; }
+  .tooltip {
+    position: absolute; background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 8px 12px; font-size: 12px; z-index: 50;
+    pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4); max-width: 200px;
+  }
+  .eraser-active .grid-cell:hover { outline-color: var(--danger) !important; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-dim); }
+  .empty-state h3 { color: var(--text); margin-bottom: 8px; }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  /* Report styles */
+  .report-area { flex: 1; overflow: auto; padding: 20px; }
+  .report-section { margin-bottom: 32px; }
+  .report-section h3 { font-size: 16px; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .report-grid-container { display: inline-block; border: 2px solid var(--border); border-radius: 4px; background: #111; margin-bottom: 12px; }
+  .report-grid { border-collapse: collapse; }
+  .report-cell {
+    width: 36px; height: 36px; border: 1px solid #222;
+    text-align: center; font-size: 8px; font-weight: 600;
+    color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    position: relative;
+  }
+  .report-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+  .report-table th { text-align: left; padding: 6px 10px; background: var(--bg3); border: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .report-table td { padding: 6px 10px; border: 1px solid var(--border); background: var(--bg); }
+  .report-legend { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0 16px; font-size: 11px; }
+  .report-legend-item { display: flex; align-items: center; gap: 4px; }
+  .report-legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+  .report-summary { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .report-stat {
+    background: var(--bg); border-radius: 6px; padding: 12px 16px;
+    border: 1px solid var(--border); min-width: 140px;
+  }
+  .report-stat-value { font-size: 20px; font-weight: 700; }
+  .report-stat-label { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  /* Import/Export bar */
+  .io-bar {
+    display: flex; gap: 6px; align-items: center; padding: 8px 14px;
+    border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2);
+  }
+  .io-bar button { font-size: 11px; padding: 4px 10px; }
+  /* Print styles */
+  @media print {
+    body { background: #fff; color: #000; }
+    .sidebar, .toolbar, .stats-bar, .io-bar, .tooltip { display: none !important; }
+    .app { display: block; }
+    .main { display: block; }
+    .report-area { padding: 0; }
+    .report-section h3 { color: #000; border-bottom-color: #ccc; }
+    .report-cell { border-color: #999; }
+    .report-table th { background: #ddd; border-color: #999; color: #000; }
+    .report-table td { background: #fff; border-color: #999; color: #000; }
+    .report-stat { border-color: #999; background: #f5f5f5; }
+    .report-stat-value { color: #000; }
+    .report-stat-label { color: #666; }
+    .report-grid-container { border-color: #999; }
+    .grid-container, .grid-table { border-color: #999; }
+    .report-legend-swatch, .port-swatch { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .report-cell { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
+  @media (max-width: 900px) { .sidebar { width: 280px; min-width: 280px; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="sidebar">
+    <div style="padding:14px;border-bottom:1px solid var(--border)">
+      <h2 style="font-size:16px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:20px">⬜</span> LED Wiring Planner
+      </h2>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Design signal &amp; power layouts for LED walls</div>
+    </div>
+    <!-- Import/Export -->
+    <div class="io-bar">
+      <button class="small secondary" onclick="exportProject()">Export JSON</button>
+      <button class="small secondary" onclick="document.getElementById('importFile').click()">Import JSON</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProject(event)">
+      <div style="flex:1"></div>
+      <button class="small danger" onclick="clearProject()">New</button>
+    </div>
+    <!-- PANEL DEFINITIONS -->
+    <div class="section">
+      <div class="section-title">
+        <span>LED Panel Types</span>
+        <button class="small" onclick="showPanelForm()">+ Add</button>
+      </div>
+      <div id="panelForm" style="display:none">
+        <label>Panel Name</label>
+        <input id="pName" placeholder="e.g. ROE BP2V2">
+        <div class="row">
+          <div><label>Pixel W</label><input id="pPixW" type="number" placeholder="256"></div>
+          <div><label>Pixel H</label><input id="pPixH" type="number" placeholder="128"></div>
+        </div>
+        <div class="row">
+          <div><label>Pitch (mm)</label><input id="pPitch" type="number" step="0.1" placeholder="2.8"></div>
+          <div><label>Power (W)</label><input id="pPower" type="number" placeholder="180"></div>
+        </div>
+        <div class="row">
+          <div><label>Width (mm)</label><input id="pW" type="number" placeholder="500"></div>
+          <div><label>Height (mm)</label><input id="pH" type="number" placeholder="500"></div>
+        </div>
+        <div class="row">
+          <div><label>Weight (kg)</label><input id="pWeight" type="number" step="0.1" placeholder="7.5"></div>
+          <div></div>
+        </div>
+        <div class="form-actions">
+          <button onclick="savePanel()">Save Panel</button>
+          <button class="secondary" onclick="hidePanelForm()">Cancel</button>
+        </div>
+      </div>
+      <ul class="item-list" id="panelList"></ul>
+      <div id="noPanels" style="font-size:12px;color:var(--text-dim);padding:8px 0;">No panels defined yet. Click + Add to create one.</div>
+    </div>
+    <!-- SCREEN CONFIG -->
+    <div class="section">
+      <div class="section-title">Screen Configuration</div>
+      <label>Panel Type</label>
+      <select id="screenPanel" onchange="updateScreenInfo()">
+        <option value="">Select a panel type...</option>
+      </select>
+      <div class="row">
+        <div><label>Panels Wide</label><input id="screenW" type="number" value="4" min="1" max="100"></div>
+        <div><label>Panels High</label><input id="screenH" type="number" value="3" min="1" max="100"></div>
+      </div>
+      <div id="screenInfo" style="font-size:12px;color:var(--text-dim);margin-top:8px"></div>
+      <div class="form-actions">
+        <button onclick="buildScreen()">Build Screen</button>
+      </div>
+    </div>
+    <!-- CONTROLLERS -->
+    <div class="section">
+      <div class="section-title">
+        <span>Controllers</span>
+        <button class="small" onclick="showControllerForm()">+ Add</button>
+      </div>
+      <div id="controllerForm" style="display:none">
+        <label>Controller Type</label>
+        <select id="ctrlPreset" onchange="applyControllerPreset()">
+          <option value="">Custom...</option>
+          <optgroup label="Novastar">
+            <option value="MCTRL4K">Novastar MCTRL4K</option>
+            <option value="MCTRL660">Novastar MCTRL660</option>
+            <option value="MCTRL300">Novastar MCTRL300</option>
+            <option value="VX4S">Novastar VX4S</option>
+            <option value="VX6S">Novastar VX6S</option>
+            <option value="VX1000">Novastar VX1000</option>
+          </optgroup>
+          <optgroup label="Martin / P3">
+            <option value="P3-050">Martin P3-050</option>
+            <option value="P3-150">Martin P3-150</option>
+            <option value="P3-300">Martin P3-300</option>
+          </optgroup>
+        </select>
+        <label>Name / Label</label>
+        <input id="ctrlName" placeholder="e.g. Controller A">
+        <div class="row">
+          <div><label>Ports</label><input id="ctrlPorts" type="number" value="4" min="1" max="20"></div>
+          <div><label>Max pixels/port</label><input id="ctrlPixPerPort" type="number" value="650000"></div>
+        </div>
+        <label>Total max pixels</label>
+        <input id="ctrlMaxPix" type="number" value="2300000">
+        <div class="form-actions">
+          <button onclick="saveController()">Add Controller</button>
+          <button class="secondary" onclick="hideControllerForm()">Cancel</button>
+        </div>
+      </div>
+      <ul class="item-list" id="controllerList"></ul>
+      <div id="noControllers" style="font-size:12px;color:var(--text-dim);padding:8px 0;">No controllers added yet.</div>
+    </div>
+    <!-- POWER CIRCUITS -->
+    <div class="section">
+      <div class="section-title">
+        <span>Power Circuits</span>
+        <button class="small" onclick="showPowerForm()">+ Add</button>
+      </div>
+      <div id="powerForm" style="display:none">
+        <label>Circuit Label</label>
+        <input id="pwrName" placeholder="e.g. Circuit A1">
+        <div class="row">
+          <div><label>Breaker (A)</label><input id="pwrAmps" type="number" value="16"></div>
+          <div><label>Voltage (V)</label><input id="pwrVolts" type="number" value="230"></div>
+        </div>
+        <div class="form-actions">
+          <button onclick="savePowerCircuit()">Add Circuit</button>
+          <button class="secondary" onclick="hidePowerForm()">Cancel</button>
+        </div>
+      </div>
+      <ul class="item-list" id="powerList"></ul>
+      <div id="noPower" style="font-size:12px;color:var(--text-dim);padding:8px 0;">No power circuits defined yet.</div>
+    </div>
+  </div>
+
+  <!-- MAIN AREA -->
+  <div class="main">
+    <div class="toolbar">
+      <div class="tabs">
+        <div class="tab active" data-tab="paint" onclick="switchTab('paint')">Paint</div>
+        <div class="tab" data-tab="util" onclick="switchTab('util')">Utilization</div>
+        <div class="tab" data-tab="report" onclick="switchTab('report')">Report</div>
+      </div>
+      <div style="flex:1"></div>
+      <div id="paintControls" style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:12px;color:var(--text-dim)">Mode:</span>
+        <button class="small" id="btnSignal" onclick="setPaintMode('signal')" style="background:var(--accent2)">Signal</button>
+        <button class="small secondary" id="btnPower" onclick="setPaintMode('power')">Power</button>
+        <button class="small secondary" id="btnErase" onclick="setPaintMode('erase')">Eraser</button>
+        <div style="width:1px;height:20px;background:var(--border)"></div>
+        <div id="activeBrushInfo" style="font-size:12px;color:var(--text-dim)">Select a port or circuit to paint</div>
+      </div>
+      <div id="reportControls" style="display:none;gap:8px;align-items:center;">
+        <button class="small secondary" onclick="window.print()">Print Report</button>
+      </div>
+    </div>
+
+    <!-- PAINT VIEW -->
+    <div id="paintView">
+      <div class="canvas-area" id="canvasArea">
+        <div class="empty-state" id="emptyState">
+          <h3>No Screen Built</h3>
+          <p>Define a panel type, set your screen dimensions, and click "Build Screen" to get started.</p>
+        </div>
+        <div id="gridWrapper" style="display:none">
+          <div id="screenLabel" style="font-size:13px;color:var(--text-dim);margin-bottom:8px"></div>
+          <div class="grid-container" id="gridContainer">
+            <table class="grid-table" id="gridTable"></table>
+          </div>
+        </div>
+      </div>
+      <div class="stats-bar" id="statsBar">
+        <div class="stat"><span class="stat-label">Total Pixels:</span> <span class="stat-value" id="statTotalPix">-</span></div>
+        <div class="stat"><span class="stat-label">Screen Size:</span> <span class="stat-value" id="statScreenSize">-</span></div>
+        <div class="stat"><span class="stat-label">Total Power:</span> <span class="stat-value" id="statTotalPower">-</span></div>
+        <div class="stat"><span class="stat-label">Total Weight:</span> <span class="stat-value" id="statWeight">-</span></div>
+        <div class="stat"><span class="stat-label">Panels Assigned:</span> <span class="stat-value" id="statAssigned">-</span></div>
+        <div class="stat"><span class="stat-label">Unpatched:</span> <span class="stat-value" id="statUnpatched" style="color:var(--warning)">-</span></div>
+      </div>
+    </div>
+
+    <!-- UTILIZATION VIEW -->
+    <div id="utilView" style="display:none;overflow:auto;flex:1;">
+      <div class="util-panel" id="utilPanel">
+        <div class="empty-state">Build a screen and assign ports to see utilization data.</div>
+      </div>
+    </div>
+
+    <!-- REPORT VIEW -->
+    <div id="reportView" style="display:none;overflow:auto;flex:1;">
+      <div class="report-area" id="reportArea">
+        <div class="empty-state">Build a screen and assign signal/power to generate a report.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip" style="display:none"></div>
+
+<script>
+// ============================================================
+// DATA MODEL
+// ============================================================
+const state = {
+  panels: [],
+  controllers: [],
+  powerCircuits: [],
+  screen: null,
+  paintMode: 'signal',
+  activeBrush: null,
+  isPainting: false,
+};
+
+let nextId = 1;
+const gid = () => nextId++;
+
+const SIGNAL_COLORS = [
+  '#e94560','#533483','#0f3460','#4caf50','#ff9800','#2196f3',
+  '#9c27b0','#00bcd4','#8bc34a','#ff5722','#607d8b','#e91e63',
+  '#3f51b5','#009688','#cddc39','#795548','#ffc107','#673ab7',
+  '#03a9f4','#f44336'
+];
+const POWER_COLORS = [
+  '#ffeb3b','#ffc107','#ff9800','#ff5722','#f44336',
+  '#e91e63','#ce93d8','#80cbc4','#a5d6a7','#fff176'
+];
+
+const PRESETS = {
+  'MCTRL4K':  { name:'Novastar MCTRL4K',  ports:4,  pixPerPort:2300000, maxPixels:4096*2160 },
+  'MCTRL660': { name:'Novastar MCTRL660',  ports:2,  pixPerPort:1300000, maxPixels:2048*1280 },
+  'MCTRL300': { name:'Novastar MCTRL300',  ports:1,  pixPerPort:650000,  maxPixels:650000 },
+  'VX4S':     { name:'Novastar VX4S',      ports:4,  pixPerPort:2300000, maxPixels:4096*2160 },
+  'VX6S':     { name:'Novastar VX6S',      ports:6,  pixPerPort:2300000, maxPixels:4096*2160 },
+  'VX1000':   { name:'Novastar VX1000',    ports:10, pixPerPort:2300000, maxPixels:10400000 },
+  'P3-050':   { name:'Martin P3-050',      ports:2,  pixPerPort:327680,  maxPixels:655360 },
+  'P3-150':   { name:'Martin P3-150',      ports:6,  pixPerPort:327680,  maxPixels:1966080 },
+  'P3-300':   { name:'Martin P3-300',      ports:12, pixPerPort:327680,  maxPixels:3932160 },
+};
+
+// Built-in panel library — ships with the app, always available.
+// Users can add custom panels on top of these.
+const PANEL_LIBRARY = [
+  // Add your commonly used panels here. These are just examples to get started.
+  // { name:'ROE BP2V2', pixW:256, pixH:128, pitch:2.84, power:180, width:500, height:500, weight:7.5 },
+];
+
+// ============================================================
+// IMPORT / EXPORT
+// ============================================================
+function exportProject() {
+  const exportData = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    panels: state.panels,
+    controllers: state.controllers,
+    powerCircuits: state.powerCircuits,
+    screen: state.screen,
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const name = state.screen ? `led-wiring-${state.screen.cols}x${state.screen.rows}` : 'led-wiring-project';
+  a.href = url;
+  a.download = `${name}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importProject(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.panels || !data.controllers) {
+        alert('Invalid project file.'); return;
+      }
+      state.panels = data.panels || [];
+      state.controllers = data.controllers || [];
+      state.powerCircuits = data.powerCircuits || [];
+      state.screen = data.screen || null;
+      state.activeBrush = null;
+      // Recalculate nextId
+      nextId = Math.max(1,
+        ...state.panels.map(p => p.id + 1),
+        ...state.controllers.map(c => c.id + 1),
+        ...state.powerCircuits.map(p => p.id + 1)
+      );
+      refreshAll();
+      saveState();
+    } catch(err) {
+      alert('Failed to parse project file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // reset so same file can be re-imported
+}
+
+function clearProject() {
+  if (!confirm('Start a new project? This will clear all current data.')) return;
+  state.panels = [];
+  state.controllers = [];
+  state.powerCircuits = [];
+  state.screen = null;
+  state.activeBrush = null;
+  nextId = 1;
+  refreshAll();
+  saveState();
+}
+
+function refreshAll() {
+  renderPanelList();
+  updatePanelSelect();
+  renderControllerList();
+  renderPowerList();
+  if (state.screen) {
+    renderGrid();
+    updateStats();
+  } else {
+    document.getElementById('emptyState').style.display = '';
+    document.getElementById('gridWrapper').style.display = 'none';
+  }
+  updateBrushInfo();
+}
+
+// ============================================================
+// PANEL MANAGEMENT
+// ============================================================
+function showPanelForm() { document.getElementById('panelForm').style.display = 'block'; }
+function hidePanelForm() { document.getElementById('panelForm').style.display = 'none'; clearPanelForm(); }
+function clearPanelForm() {
+  ['pName','pPixW','pPixH','pPitch','pPower','pW','pH','pWeight'].forEach(id => document.getElementById(id).value = '');
+}
+
+function savePanel() {
+  const name = document.getElementById('pName').value.trim();
+  const pixW = parseInt(document.getElementById('pPixW').value);
+  const pixH = parseInt(document.getElementById('pPixH').value);
+  const pitch = parseFloat(document.getElementById('pPitch').value);
+  const power = parseFloat(document.getElementById('pPower').value);
+  const width = parseFloat(document.getElementById('pW').value);
+  const height = parseFloat(document.getElementById('pH').value);
+  const weight = parseFloat(document.getElementById('pWeight').value) || 0;
+  if (!name || !pixW || !pixH || !pitch || !power || !width || !height) {
+    alert('Please fill in all panel fields.'); return;
+  }
+  state.panels.push({ id: gid(), name, pixW, pixH, pitch, power, width, height, weight });
+  hidePanelForm();
+  renderPanelList();
+  updatePanelSelect();
+  saveState();
+}
+
+function deletePanel(id) {
+  state.panels = state.panels.filter(p => p.id !== id);
+  renderPanelList();
+  updatePanelSelect();
+  saveState();
+}
+
+function renderPanelList() {
+  const ul = document.getElementById('panelList');
+  const none = document.getElementById('noPanels');
+  none.style.display = state.panels.length ? 'none' : 'block';
+  ul.innerHTML = state.panels.map(p => `
+    <li>
+      <div>
+        <strong>${esc(p.name)}</strong><br>
+        <span class="info">${p.pixW}×${p.pixH}px | ${p.pitch}mm | ${p.width}×${p.height}mm | ${p.power}W | ${p.weight||0}kg</span>
+      </div>
+      <div class="actions">
+        <button class="small danger" onclick="deletePanel(${p.id})">×</button>
+      </div>
+    </li>`).join('');
+}
+
+function updatePanelSelect() {
+  const sel = document.getElementById('screenPanel');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select a panel type...</option>' +
+    state.panels.map(p => `<option value="${p.id}">${esc(p.name)} (${p.pixW}×${p.pixH})</option>`).join('');
+  if (current && state.panels.find(p => p.id == current)) sel.value = current;
+  updateScreenInfo();
+}
+
+function updateScreenInfo() {
+  const info = document.getElementById('screenInfo');
+  const pid = parseInt(document.getElementById('screenPanel').value);
+  const panel = state.panels.find(p => p.id === pid);
+  if (!panel) { info.textContent = ''; return; }
+  const cols = parseInt(document.getElementById('screenW').value) || 0;
+  const rows = parseInt(document.getElementById('screenH').value) || 0;
+  const totalPix = panel.pixW * cols * panel.pixH * rows;
+  const physW = (panel.width * cols / 1000).toFixed(2);
+  const physH = (panel.height * rows / 1000).toFixed(2);
+  const totalPower = panel.power * cols * rows;
+  const totalWeight = (panel.weight||0) * cols * rows;
+  info.innerHTML = `${cols * panel.pixW} × ${rows * panel.pixH} px | ${physW} × ${physH} m | ${totalPix.toLocaleString()} total px | ${totalPower.toLocaleString()} W max` + (totalWeight > 0 ? ` | ${totalWeight.toFixed(1)} kg` : '');
+}
+
+// ============================================================
+// SCREEN BUILDER
+// ============================================================
+function buildScreen() {
+  const pid = parseInt(document.getElementById('screenPanel').value);
+  const panel = state.panels.find(p => p.id === pid);
+  if (!panel) { alert('Select a panel type first.'); return; }
+  const cols = parseInt(document.getElementById('screenW').value) || 0;
+  const rows = parseInt(document.getElementById('screenH').value) || 0;
+  if (cols < 1 || rows < 1) { alert('Screen must be at least 1×1 panels.'); return; }
+  if (cols > 60 || rows > 60) { alert('Maximum 60×60 panels for performance.'); return; }
+  const grid = [];
+  for (let r = 0; r < rows; r++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) row.push({ signal: null, power: null });
+    grid.push(row);
+  }
+  state.screen = { panelId: pid, cols, rows, grid };
+  renderGrid();
+  updateStats();
+  saveState();
+}
+
+function renderGrid() {
+  if (!state.screen) return;
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('gridWrapper').style.display = 'block';
+  const { cols, rows, panelId } = state.screen;
+  const panel = state.panels.find(p => p.id === panelId);
+  document.getElementById('screenLabel').textContent =
+    `${panel.name} — ${cols}×${rows} panels (${cols * panel.pixW}×${rows * panel.pixH} px) — ${(panel.width * cols / 1000).toFixed(2)}×${(panel.height * rows / 1000).toFixed(2)} m`;
+  const table = document.getElementById('gridTable');
+  table.innerHTML = '';
+  for (let r = 0; r < rows; r++) {
+    const tr = document.createElement('tr');
+    for (let c = 0; c < cols; c++) {
+      const td = document.createElement('td');
+      td.className = 'grid-cell';
+      td.dataset.row = r;
+      td.dataset.col = c;
+      td.innerHTML = `<span class="cell-label">${r + 1},${c + 1}</span><span class="cell-port"></span><span class="cell-power"></span>`;
+      td.addEventListener('mousedown', (e) => { state.isPainting = true; paintCell(r, c); e.preventDefault(); });
+      td.addEventListener('mouseenter', (e) => { if (state.isPainting) paintCell(r, c); showTooltip(e, r, c); });
+      td.addEventListener('mouseleave', () => hideTooltip());
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+  colorizeGrid();
+}
+
+function paintCell(r, c) {
+  if (!state.screen) return;
+  const cell = state.screen.grid[r][c];
+  if (state.paintMode === 'erase') {
+    cell.signal = null;
+    cell.power = null;
+  } else if (state.paintMode === 'signal' && state.activeBrush && state.activeBrush.type === 'signal') {
+    cell.signal = { controllerId: state.activeBrush.controllerId, portIndex: state.activeBrush.portIndex };
+  } else if (state.paintMode === 'power' && state.activeBrush && state.activeBrush.type === 'power') {
+    cell.power = { circuitId: state.activeBrush.circuitId };
+  }
+  colorizeCell(r, c);
+  updateStats();
+  renderUtilization();
+  saveState();
+}
+
+document.addEventListener('mouseup', () => { state.isPainting = false; });
+
+function colorizeGrid() {
+  if (!state.screen) return;
+  const { rows, cols } = state.screen;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      colorizeCell(r, c);
+}
+
+function colorizeCell(r, c) {
+  const cell = state.screen.grid[r][c];
+  const td = document.querySelector(`.grid-cell[data-row="${r}"][data-col="${c}"]`);
+  if (!td) return;
+  let bg = '#1a1a2e';
+  let portLabel = '';
+  let powerLabel = '';
+  if (cell.signal) {
+    const ctrl = state.controllers.find(ct => ct.id === cell.signal.controllerId);
+    if (ctrl) {
+      bg = ctrl.portColors[cell.signal.portIndex] || '#555';
+      portLabel = `${ctrl.name.substring(0, 6)}:${cell.signal.portIndex + 1}`;
+    }
+  }
+  if (cell.power) {
+    const circ = state.powerCircuits.find(p => p.id === cell.power.circuitId);
+    if (circ) {
+      powerLabel = circ.name.substring(0, 6);
+      if (!cell.signal) bg = circ.color;
+    }
+  }
+  if (cell.signal && cell.power) {
+    const circ = state.powerCircuits.find(p => p.id === cell.power.circuitId);
+    td.style.borderColor = circ ? circ.color : '#222';
+    td.style.borderWidth = '2px';
+  } else {
+    td.style.borderColor = '#222';
+    td.style.borderWidth = '1px';
+  }
+  td.style.backgroundColor = bg;
+  td.querySelector('.cell-port').textContent = portLabel;
+  td.querySelector('.cell-power').textContent = powerLabel;
+}
+
+// ============================================================
+// TOOLTIP
+// ============================================================
+function showTooltip(e, r, c) {
+  if (!state.screen) return;
+  const cell = state.screen.grid[r][c];
+  const panel = state.panels.find(p => p.id === state.screen.panelId);
+  let html = `<strong>Panel ${r + 1},${c + 1}</strong><br>`;
+  html += `${panel.pixW}×${panel.pixH} px (${(panel.pixW * panel.pixH).toLocaleString()} px)<br>`;
+  html += `Power: ${panel.power}W | Weight: ${panel.weight||0}kg<br>`;
+  if (cell.signal) {
+    const ctrl = state.controllers.find(ct => ct.id === cell.signal.controllerId);
+    html += `<br><strong>Signal:</strong> ${ctrl ? esc(ctrl.name) : '?'} Port ${cell.signal.portIndex + 1}`;
+  } else {
+    html += `<br><em>No signal assigned</em>`;
+  }
+  if (cell.power) {
+    const circ = state.powerCircuits.find(p => p.id === cell.power.circuitId);
+    html += `<br><strong>Power:</strong> ${circ ? esc(circ.name) : '?'}`;
+  } else {
+    html += `<br><em>No power circuit assigned</em>`;
+  }
+  const tip = document.getElementById('tooltip');
+  tip.innerHTML = html;
+  tip.style.display = 'block';
+  tip.style.left = (e.pageX + 12) + 'px';
+  tip.style.top = (e.pageY + 12) + 'px';
+}
+function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
+
+// ============================================================
+// CONTROLLER MANAGEMENT
+// ============================================================
+function showControllerForm() { document.getElementById('controllerForm').style.display = 'block'; }
+function hideControllerForm() {
+  document.getElementById('controllerForm').style.display = 'none';
+  document.getElementById('ctrlPreset').value = '';
+  document.getElementById('ctrlName').value = '';
+}
+
+function applyControllerPreset() {
+  const key = document.getElementById('ctrlPreset').value;
+  if (!key) return;
+  const p = PRESETS[key];
+  document.getElementById('ctrlName').value = p.name;
+  document.getElementById('ctrlPorts').value = p.ports;
+  document.getElementById('ctrlPixPerPort').value = p.pixPerPort;
+  document.getElementById('ctrlMaxPix').value = p.maxPixels;
+}
+
+function saveController() {
+  const name = document.getElementById('ctrlName').value.trim();
+  const ports = parseInt(document.getElementById('ctrlPorts').value);
+  const pixPerPort = parseInt(document.getElementById('ctrlPixPerPort').value);
+  const maxPixels = parseInt(document.getElementById('ctrlMaxPix').value);
+  if (!name || !ports) { alert('Name and port count required.'); return; }
+  const colorOffset = state.controllers.reduce((sum, c) => sum + c.ports, 0);
+  const portColors = [];
+  for (let i = 0; i < ports; i++) portColors.push(SIGNAL_COLORS[(colorOffset + i) % SIGNAL_COLORS.length]);
+  state.controllers.push({ id: gid(), name, preset: document.getElementById('ctrlPreset').value, ports, pixPerPort, maxPixels, portColors });
+  hideControllerForm();
+  renderControllerList();
+  saveState();
+}
+
+function deleteController(id) {
+  if (state.screen) {
+    const { rows, cols, grid } = state.screen;
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        if (grid[r][c].signal && grid[r][c].signal.controllerId === id) grid[r][c].signal = null;
+    colorizeGrid();
+    updateStats();
+  }
+  state.controllers = state.controllers.filter(c => c.id !== id);
+  if (state.activeBrush && state.activeBrush.type === 'signal' && state.activeBrush.controllerId === id) {
+    state.activeBrush = null;
+    updateBrushInfo();
+  }
+  renderControllerList();
+  saveState();
+}
+
+function renderControllerList() {
+  const ul = document.getElementById('controllerList');
+  const none = document.getElementById('noControllers');
+  none.style.display = state.controllers.length ? 'none' : 'block';
+  ul.innerHTML = state.controllers.map(ctrl => {
+    let portsHtml = '';
+    for (let i = 0; i < ctrl.ports; i++) {
+      const usage = getPortUsage(ctrl.id, i);
+      const pct = ctrl.pixPerPort > 0 ? Math.round(usage / ctrl.pixPerPort * 100) : 0;
+      const isSelected = state.activeBrush && state.activeBrush.type === 'signal' &&
+        state.activeBrush.controllerId === ctrl.id && state.activeBrush.portIndex === i;
+      portsHtml += `
+        <li class="${isSelected ? 'selected' : ''}" onclick="selectSignalBrush(${ctrl.id},${i})">
+          <span class="port-swatch" style="background:${ctrl.portColors[i]}"></span>
+          <span>P${i + 1}</span>
+          <span class="port-bar"><span class="port-bar-fill" style="width:${pct}%;background:${pct > 90 ? 'var(--danger)' : pct > 70 ? 'var(--warning)' : ctrl.portColors[i]}"></span></span>
+          <span style="font-size:10px;color:var(--text-dim);width:35px;text-align:right">${pct}%</span>
+        </li>`;
+    }
+    return `
+      <li style="display:block;cursor:default">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>${esc(ctrl.name)}</strong>
+          <button class="small danger" onclick="deleteController(${ctrl.id})">×</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim)">${ctrl.ports} ports | ${ctrl.pixPerPort.toLocaleString()} px/port | ${ctrl.maxPixels.toLocaleString()} max</div>
+        <ul class="port-list">${portsHtml}</ul>
+      </li>`;
+  }).join('');
+}
+
+function getPortUsage(controllerId, portIndex) {
+  if (!state.screen) return 0;
+  const panel = state.panels.find(p => p.id === state.screen.panelId);
+  if (!panel) return 0;
+  const pixPerPanel = panel.pixW * panel.pixH;
+  let count = 0;
+  const { rows, cols, grid } = state.screen;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      if (grid[r][c].signal && grid[r][c].signal.controllerId === controllerId && grid[r][c].signal.portIndex === portIndex)
+        count++;
+  return count * pixPerPanel;
+}
+
+function getPortPanelList(controllerId, portIndex) {
+  if (!state.screen) return [];
+  const panels = [];
+  const { rows, cols, grid } = state.screen;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      if (grid[r][c].signal && grid[r][c].signal.controllerId === controllerId && grid[r][c].signal.portIndex === portIndex)
+        panels.push({ r: r + 1, c: c + 1 });
+  return panels;
+}
+
+function getCircuitPanelList(circuitId) {
+  if (!state.screen) return [];
+  const panels = [];
+  const { rows, cols, grid } = state.screen;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      if (grid[r][c].power && grid[r][c].power.circuitId === circuitId)
+        panels.push({ r: r + 1, c: c + 1 });
+  return panels;
+}
+
+function selectSignalBrush(controllerId, portIndex) {
+  state.paintMode = 'signal';
+  state.activeBrush = { type: 'signal', controllerId, portIndex };
+  updatePaintModeButtons();
+  updateBrushInfo();
+  renderControllerList();
+  renderPowerList();
+}
+
+// ============================================================
+// POWER CIRCUIT MANAGEMENT
+// ============================================================
+function showPowerForm() { document.getElementById('powerForm').style.display = 'block'; }
+function hidePowerForm() { document.getElementById('powerForm').style.display = 'none'; }
+
+function savePowerCircuit() {
+  const name = document.getElementById('pwrName').value.trim();
+  const amps = parseFloat(document.getElementById('pwrAmps').value);
+  const volts = parseFloat(document.getElementById('pwrVolts').value);
+  if (!name || !amps || !volts) { alert('Fill in all fields.'); return; }
+  const colorIdx = state.powerCircuits.length % POWER_COLORS.length;
+  state.powerCircuits.push({ id: gid(), name, amps, volts, color: POWER_COLORS[colorIdx] });
+  hidePowerForm();
+  renderPowerList();
+  saveState();
+}
+
+function deletePowerCircuit(id) {
+  if (state.screen) {
+    const { rows, cols, grid } = state.screen;
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        if (grid[r][c].power && grid[r][c].power.circuitId === id) grid[r][c].power = null;
+    colorizeGrid();
+    updateStats();
+  }
+  state.powerCircuits = state.powerCircuits.filter(p => p.id !== id);
+  if (state.activeBrush && state.activeBrush.type === 'power' && state.activeBrush.circuitId === id) {
+    state.activeBrush = null;
+    updateBrushInfo();
+  }
+  renderPowerList();
+  saveState();
+}
+
+function renderPowerList() {
+  const ul = document.getElementById('powerList');
+  const none = document.getElementById('noPower');
+  none.style.display = state.powerCircuits.length ? 'none' : 'block';
+  ul.innerHTML = state.powerCircuits.map(circ => {
+    const usage = getPowerUsage(circ.id);
+    const capacity = circ.amps * circ.volts;
+    const pct = capacity > 0 ? Math.round(usage / capacity * 100) : 0;
+    const isSelected = state.activeBrush && state.activeBrush.type === 'power' && state.activeBrush.circuitId === circ.id;
+    return `
+      <li class="${isSelected ? 'active' : ''}" onclick="selectPowerBrush(${circ.id})">
+        <div>
+          <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${circ.color};margin-right:6px;vertical-align:middle"></span>
+          <strong>${esc(circ.name)}</strong><br>
+          <span class="info">${circ.amps}A × ${circ.volts}V = ${capacity.toLocaleString()}W capacity | ${usage.toLocaleString()}W used (${pct}%)</span>
+        </div>
+        <div class="actions">
+          <button class="small danger" onclick="event.stopPropagation();deletePowerCircuit(${circ.id})">×</button>
+        </div>
+      </li>`;
+  }).join('');
+}
+
+function getPowerUsage(circuitId) {
+  if (!state.screen) return 0;
+  const panel = state.panels.find(p => p.id === state.screen.panelId);
+  if (!panel) return 0;
+  let count = 0;
+  const { rows, cols, grid } = state.screen;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      if (grid[r][c].power && grid[r][c].power.circuitId === circuitId) count++;
+  return count * panel.power;
+}
+
+function selectPowerBrush(circuitId) {
+  state.paintMode = 'power';
+  state.activeBrush = { type: 'power', circuitId };
+  updatePaintModeButtons();
+  updateBrushInfo();
+  renderControllerList();
+  renderPowerList();
+}
+
+// ============================================================
+// PAINT MODE
+// ============================================================
+function setPaintMode(mode) {
+  state.paintMode = mode;
+  if (mode === 'erase') {
+    state.activeBrush = null;
+    renderControllerList();
+    renderPowerList();
+  }
+  updatePaintModeButtons();
+  updateBrushInfo();
+  const container = document.getElementById('gridContainer');
+  if (container) container.className = mode === 'erase' ? 'grid-container eraser-active' : 'grid-container';
+}
+
+function updatePaintModeButtons() {
+  document.getElementById('btnSignal').className = state.paintMode === 'signal' ? 'small' : 'small secondary';
+  document.getElementById('btnSignal').style.background = state.paintMode === 'signal' ? 'var(--accent2)' : '';
+  document.getElementById('btnPower').className = state.paintMode === 'power' ? 'small' : 'small secondary';
+  document.getElementById('btnPower').style.background = state.paintMode === 'power' ? 'var(--warning)' : '';
+  document.getElementById('btnErase').className = state.paintMode === 'erase' ? 'small' : 'small secondary';
+  document.getElementById('btnErase').style.background = state.paintMode === 'erase' ? 'var(--danger)' : '';
+}
+
+function updateBrushInfo() {
+  const el = document.getElementById('activeBrushInfo');
+  if (state.paintMode === 'erase') {
+    el.innerHTML = '<span class="paint-mode erase">Eraser — click panels to clear assignments</span>';
+  } else if (state.activeBrush && state.activeBrush.type === 'signal') {
+    const ctrl = state.controllers.find(c => c.id === state.activeBrush.controllerId);
+    const color = ctrl ? ctrl.portColors[state.activeBrush.portIndex] : '#555';
+    el.innerHTML = `<span class="paint-mode signal"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${color}"></span> ${ctrl ? esc(ctrl.name) : ''} Port ${state.activeBrush.portIndex + 1}</span>`;
+  } else if (state.activeBrush && state.activeBrush.type === 'power') {
+    const circ = state.powerCircuits.find(p => p.id === state.activeBrush.circuitId);
+    el.innerHTML = `<span class="paint-mode power"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${circ ? circ.color : '#555'}"></span> ${circ ? esc(circ.name) : ''}</span>`;
+  } else {
+    el.textContent = 'Select a port or circuit from the sidebar to paint';
+  }
+}
+
+// ============================================================
+// STATS
+// ============================================================
+function updateStats() {
+  if (!state.screen) return;
+  const panel = state.panels.find(p => p.id === state.screen.panelId);
+  if (!panel) return;
+  const { rows, cols, grid } = state.screen;
+  const totalPanels = rows * cols;
+  const pixPerPanel = panel.pixW * panel.pixH;
+  const totalPix = totalPanels * pixPerPanel;
+  let assignedSignal = 0, assignedPower = 0;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c].signal) assignedSignal++;
+      if (grid[r][c].power) assignedPower++;
+    }
+  const unpatched = totalPanels - assignedSignal;
+  const totalWeight = totalPanels * (panel.weight || 0);
+  document.getElementById('statTotalPix').textContent = totalPix.toLocaleString();
+  document.getElementById('statScreenSize').textContent = `${(panel.width * cols / 1000).toFixed(2)} × ${(panel.height * rows / 1000).toFixed(2)} m`;
+  document.getElementById('statTotalPower').textContent = `${(totalPanels * panel.power).toLocaleString()} W`;
+  document.getElementById('statWeight').textContent = totalWeight > 0 ? `${totalWeight.toFixed(1)} kg` : '-';
+  document.getElementById('statAssigned').textContent = `Signal: ${assignedSignal}/${totalPanels} | Power: ${assignedPower}/${totalPanels}`;
+  const unpatchedEl = document.getElementById('statUnpatched');
+  unpatchedEl.textContent = `${unpatched} panels`;
+  unpatchedEl.style.color = unpatched > 0 ? 'var(--warning)' : 'var(--success)';
+}
+
+// ============================================================
+// UTILIZATION VIEW
+// ============================================================
+function renderUtilization() {
+  if (!state.screen) return;
+  const panel = state.panels.find(p => p.id === state.screen.panelId);
+  if (!panel) return;
+  const pixPerPanel = panel.pixW * panel.pixH;
+  const div = document.getElementById('utilPanel');
+  let html = '';
+
+  state.controllers.forEach(ctrl => {
+    let totalCtrlPix = 0;
+    let portRows = '';
+    for (let i = 0; i < ctrl.ports; i++) {
+      const usage = getPortUsage(ctrl.id, i);
+      totalCtrlPix += usage;
+      const pct = ctrl.pixPerPort > 0 ? (usage / ctrl.pixPerPort * 100) : 0;
+      const color = pct > 95 ? 'var(--danger)' : pct > 75 ? 'var(--warning)' : ctrl.portColors[i];
+      const panelCount = pixPerPanel > 0 ? Math.round(usage / pixPerPanel) : 0;
+      portRows += `
+        <div class="util-row">
+          <span class="port-swatch" style="background:${ctrl.portColors[i]}"></span>
+          <span style="width:40px">Port ${i + 1}</span>
+          <span class="util-bar"><span class="util-bar-fill" style="width:${Math.min(pct, 100)}%;background:${color}"></span></span>
+          <span class="util-pct" style="color:${pct > 95 ? 'var(--danger)' : pct > 75 ? 'var(--warning)' : 'var(--text-dim)'}">${pct.toFixed(1)}%</span>
+          <span style="width:90px;font-size:11px;color:var(--text-dim)">${usage.toLocaleString()} px</span>
+          <span style="font-size:11px;color:var(--text-dim)">${panelCount} panels</span>
+        </div>`;
+    }
+    const totalPct = ctrl.maxPixels > 0 ? (totalCtrlPix / ctrl.maxPixels * 100) : 0;
+    html += `
+      <div class="util-card">
+        <h4><span>${esc(ctrl.name)}</span>
+        <span style="font-size:12px;color:${totalPct > 95 ? 'var(--danger)' : totalPct > 75 ? 'var(--warning)' : 'var(--text-dim)'}">
+          ${totalCtrlPix.toLocaleString()} / ${ctrl.maxPixels.toLocaleString()} px (${totalPct.toFixed(1)}%)</span></h4>
+        ${portRows}
+      </div>`;
+  });
+
+  if (state.powerCircuits.length) {
+    html += '<h3 style="font-size:14px;margin:16px 0 10px">Power Circuits</h3>';
+    state.powerCircuits.forEach(circ => {
+      const usage = getPowerUsage(circ.id);
+      const capacity = circ.amps * circ.volts;
+      const pct = capacity > 0 ? (usage / capacity * 100) : 0;
+      const ampsDraw = circ.volts > 0 ? (usage / circ.volts).toFixed(1) : 0;
+      const color = pct > 95 ? 'var(--danger)' : pct > 80 ? 'var(--warning)' : 'var(--success)';
+      const panelCount = panel.power > 0 ? Math.round(usage / panel.power) : 0;
+      html += `
+        <div class="util-card">
+          <h4><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${circ.color};vertical-align:middle;margin-right:6px"></span>${esc(circ.name)}</span>
+          <span style="font-size:12px;color:${color}">${usage.toLocaleString()}W / ${capacity.toLocaleString()}W (${pct.toFixed(1)}%)</span></h4>
+          <div class="util-row">
+            <span style="width:60px">Load</span>
+            <span class="util-bar" style="height:12px"><span class="util-bar-fill" style="width:${Math.min(pct, 100)}%;background:${color}"></span></span>
+            <span class="util-pct" style="color:${color}">${pct.toFixed(1)}%</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:4px">
+            ${ampsDraw}A / ${circ.amps}A draw | ${panelCount} panels | ${circ.volts}V
+          </div>
+        </div>`;
+    });
+  }
+
+  // Warnings
+  if (state.controllers.length || state.powerCircuits.length) {
+    const { rows, cols, grid } = state.screen;
+    let unassignedSignal = 0, unassignedPower = 0;
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++) {
+        if (!grid[r][c].signal) unassignedSignal++;
+        if (!grid[r][c].power) unassignedPower++;
+      }
+    const totalPanels = rows * cols;
+    if (unassignedSignal > 0 || unassignedPower > 0) {
+      html += `<div class="util-card" style="border-left:3px solid var(--warning)"><h4 style="color:var(--warning)">Warnings</h4>
+        ${unassignedSignal > 0 ? `<div style="font-size:12px;margin-bottom:4px">${unassignedSignal} of ${totalPanels} panels have no signal assignment</div>` : ''}
+        ${unassignedPower > 0 ? `<div style="font-size:12px">${unassignedPower} of ${totalPanels} panels have no power circuit assigned</div>` : ''}
+      </div>`;
+    }
+    state.controllers.forEach(ctrl => {
+      for (let i = 0; i < ctrl.ports; i++) {
+        const usage = getPortUsage(ctrl.id, i);
+        if (usage > ctrl.pixPerPort)
+          html += `<div class="util-card" style="border-left:3px solid var(--danger)"><div style="font-size:12px;color:var(--danger)"><strong>${esc(ctrl.name)} Port ${i + 1}</strong> exceeds capacity: ${usage.toLocaleString()} / ${ctrl.pixPerPort.toLocaleString()} px</div></div>`;
+      }
+    });
+    state.powerCircuits.forEach(circ => {
+      const usage = getPowerUsage(circ.id);
+      const capacity = circ.amps * circ.volts;
+      if (usage > capacity)
+        html += `<div class="util-card" style="border-left:3px solid var(--danger)"><div style="font-size:12px;color:var(--danger)"><strong>${esc(circ.name)}</strong> exceeds breaker capacity: ${usage.toLocaleString()}W / ${capacity.toLocaleString()}W</div></div>`;
+    });
+  }
+
+  div.innerHTML = html || '<div class="empty-state">Build a screen and assign ports to see utilization data.</div>';
+}
+
+// ============================================================
+// REPORT VIEW
+// ============================================================
+function renderReport() {
+  const area = document.getElementById('reportArea');
+  if (!state.screen) {
+    area.innerHTML = '<div class="empty-state">Build a screen and assign signal/power to generate a report.</div>';
+    return;
+  }
+  const panel = state.panels.find(p => p.id === state.screen.panelId);
+  if (!panel) return;
+  const { rows, cols, grid } = state.screen;
+  const totalPanels = rows * cols;
+  const pixPerPanel = panel.pixW * panel.pixH;
+
+  let html = '';
+
+  // ---- OVERVIEW SUMMARY ----
+  html += `<div class="report-section">
+    <h3>Project Overview</h3>
+    <div class="report-summary">
+      <div class="report-stat"><div class="report-stat-value">${cols * panel.pixW} × ${rows * panel.pixH}</div><div class="report-stat-label">Resolution (px)</div></div>
+      <div class="report-stat"><div class="report-stat-value">${(panel.width * cols / 1000).toFixed(2)} × ${(panel.height * rows / 1000).toFixed(2)}</div><div class="report-stat-label">Physical Size (m)</div></div>
+      <div class="report-stat"><div class="report-stat-value">${(totalPanels * pixPerPanel).toLocaleString()}</div><div class="report-stat-label">Total Pixels</div></div>
+      <div class="report-stat"><div class="report-stat-value">${totalPanels}</div><div class="report-stat-label">Total Panels</div></div>
+      <div class="report-stat"><div class="report-stat-value">${(totalPanels * panel.power).toLocaleString()} W</div><div class="report-stat-label">Max Power Draw</div></div>
+      <div class="report-stat"><div class="report-stat-value">${(totalPanels * (panel.weight||0)).toFixed(1)} kg</div><div class="report-stat-label">Total Weight</div></div>
+      <div class="report-stat"><div class="report-stat-value">${esc(panel.name)}</div><div class="report-stat-label">Panel: ${panel.pixW}×${panel.pixH}px, ${panel.pitch}mm, ${panel.width}×${panel.height}mm, ${panel.weight||0}kg</div></div>
+    </div>
+  </div>`;
+
+  // ---- SIGNAL WIRING DIAGRAM ----
+  html += `<div class="report-section">
+    <h3>Signal Wiring Diagram</h3>`;
+
+  // Mini grid showing only signal assignments
+  html += '<div class="report-grid-container"><table class="report-grid">';
+  for (let r = 0; r < rows; r++) {
+    html += '<tr>';
+    for (let c = 0; c < cols; c++) {
+      const cell = grid[r][c];
+      let bg = '#2a2a3e';
+      let label = '';
+      if (cell.signal) {
+        const ctrl = state.controllers.find(ct => ct.id === cell.signal.controllerId);
+        if (ctrl) {
+          bg = ctrl.portColors[cell.signal.portIndex] || '#555';
+          label = `P${cell.signal.portIndex + 1}`;
+        }
+      }
+      html += `<td class="report-cell" style="background:${bg};print-color-adjust:exact;-webkit-print-color-adjust:exact">${label}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</table></div>';
+
+  // Signal legend
+  html += '<div class="report-legend">';
+  state.controllers.forEach(ctrl => {
+    for (let i = 0; i < ctrl.ports; i++) {
+      const usage = getPortUsage(ctrl.id, i);
+      if (usage > 0) {
+        html += `<div class="report-legend-item"><span class="report-legend-swatch" style="background:${ctrl.portColors[i]};print-color-adjust:exact;-webkit-print-color-adjust:exact"></span>${esc(ctrl.name)} P${i + 1}</div>`;
+      }
+    }
+  });
+  html += '</div>';
+
+  // Signal table per controller
+  state.controllers.forEach(ctrl => {
+    let totalCtrlPix = 0;
+    let tableRows = '';
+    for (let i = 0; i < ctrl.ports; i++) {
+      const usage = getPortUsage(ctrl.id, i);
+      totalCtrlPix += usage;
+      const panels = getPortPanelList(ctrl.id, i);
+      const pct = ctrl.pixPerPort > 0 ? (usage / ctrl.pixPerPort * 100).toFixed(1) : 0;
+      const panelStr = panels.length > 0 ? panels.map(p => `${p.r},${p.c}`).join(' | ') : '—';
+      const overCap = usage > ctrl.pixPerPort;
+      tableRows += `<tr>
+        <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${ctrl.portColors[i]};vertical-align:middle;margin-right:4px;print-color-adjust:exact;-webkit-print-color-adjust:exact"></span>Port ${i + 1}</td>
+        <td>${panels.length}</td>
+        <td>${usage.toLocaleString()}</td>
+        <td>${ctrl.pixPerPort.toLocaleString()}</td>
+        <td style="color:${overCap ? 'var(--danger)' : ''}">${pct}%${overCap ? ' OVER' : ''}</td>
+        <td style="font-size:11px">${panelStr}</td>
+      </tr>`;
+    }
+    const totalPct = ctrl.maxPixels > 0 ? (totalCtrlPix / ctrl.maxPixels * 100).toFixed(1) : 0;
+    html += `<table class="report-table">
+      <thead><tr><th colspan="6">${esc(ctrl.name)} — ${totalCtrlPix.toLocaleString()} / ${ctrl.maxPixels.toLocaleString()} px total (${totalPct}%)</th></tr>
+      <tr><th>Port</th><th>Panels</th><th>Pixels Used</th><th>Capacity</th><th>Load</th><th>Panel Positions (row,col)</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>`;
+  });
+
+  if (!state.controllers.length) {
+    html += '<div style="color:var(--text-dim);font-size:12px;padding:8px 0">No controllers configured.</div>';
+  }
+  html += '</div>';
+
+  // ---- UNPATCHED PANELS ----
+  let unpatchedSignal = 0, unpatchedPower = 0;
+  const unpatchedList = [];
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      const hasSignal = !!grid[r][c].signal;
+      const hasPower = !!grid[r][c].power;
+      if (!hasSignal) unpatchedSignal++;
+      if (!hasPower) unpatchedPower++;
+      if (!hasSignal || !hasPower) {
+        const missing = [];
+        if (!hasSignal) missing.push('signal');
+        if (!hasPower) missing.push('power');
+        unpatchedList.push({ r: r+1, c: c+1, missing });
+      }
+    }
+  if (unpatchedList.length > 0) {
+    html += `<div class="report-section">
+      <h3 style="color:var(--warning)">Unpatched Panels (${unpatchedList.length} of ${totalPanels})</h3>
+      <div class="report-summary">
+        <div class="report-stat" style="border-color:var(--warning)"><div class="report-stat-value" style="color:var(--warning)">${unpatchedSignal}</div><div class="report-stat-label">Missing Signal</div></div>
+        <div class="report-stat" style="border-color:var(--warning)"><div class="report-stat-value" style="color:var(--warning)">${unpatchedPower}</div><div class="report-stat-label">Missing Power</div></div>
+      </div>
+      <table class="report-table">
+        <thead><tr><th>Position (row, col)</th><th>Missing</th></tr></thead>
+        <tbody>${unpatchedList.map(p => `<tr><td>${p.r}, ${p.c}</td><td style="color:var(--warning)">${p.missing.join(', ')}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+  }
+
+  // ---- POWER WIRING DIAGRAM ----
+  html += `<div class="report-section">
+    <h3>Power Wiring Diagram</h3>`;
+
+  // Mini grid showing only power assignments
+  html += '<div class="report-grid-container"><table class="report-grid">';
+  for (let r = 0; r < rows; r++) {
+    html += '<tr>';
+    for (let c = 0; c < cols; c++) {
+      const cell = grid[r][c];
+      let bg = '#2a2a3e';
+      let label = '';
+      if (cell.power) {
+        const circ = state.powerCircuits.find(p => p.id === cell.power.circuitId);
+        if (circ) {
+          bg = circ.color;
+          label = circ.name.substring(0, 4);
+        }
+      }
+      html += `<td class="report-cell" style="background:${bg};color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact">${label}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</table></div>';
+
+  // Power legend
+  html += '<div class="report-legend">';
+  state.powerCircuits.forEach(circ => {
+    html += `<div class="report-legend-item"><span class="report-legend-swatch" style="background:${circ.color};print-color-adjust:exact;-webkit-print-color-adjust:exact"></span>${esc(circ.name)} (${circ.amps}A / ${circ.volts}V)</div>`;
+  });
+  html += '</div>';
+
+  // Power table
+  if (state.powerCircuits.length) {
+    let powerTableRows = '';
+    let totalPowerDraw = 0;
+    state.powerCircuits.forEach(circ => {
+      const usage = getPowerUsage(circ.id);
+      totalPowerDraw += usage;
+      const capacity = circ.amps * circ.volts;
+      const pct = capacity > 0 ? (usage / capacity * 100).toFixed(1) : 0;
+      const ampsDraw = circ.volts > 0 ? (usage / circ.volts).toFixed(1) : '0';
+      const panels = getCircuitPanelList(circ.id);
+      const panelStr = panels.length > 0 ? panels.map(p => `${p.r},${p.c}`).join(' | ') : '—';
+      const overCap = usage > capacity;
+      powerTableRows += `<tr>
+        <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${circ.color};vertical-align:middle;margin-right:4px;print-color-adjust:exact;-webkit-print-color-adjust:exact"></span>${esc(circ.name)}</td>
+        <td>${panels.length}</td>
+        <td>${usage.toLocaleString()} W</td>
+        <td>${capacity.toLocaleString()} W</td>
+        <td>${ampsDraw}A / ${circ.amps}A</td>
+        <td style="color:${overCap ? 'var(--danger)' : ''}">${pct}%${overCap ? ' OVER' : ''}</td>
+        <td style="font-size:11px">${panelStr}</td>
+      </tr>`;
+    });
+    html += `<table class="report-table">
+      <thead><tr><th colspan="7">Power Distribution — ${totalPowerDraw.toLocaleString()} W total draw</th></tr>
+      <tr><th>Circuit</th><th>Panels</th><th>Power Draw</th><th>Capacity</th><th>Current</th><th>Load</th><th>Panel Positions (row,col)</th></tr></thead>
+      <tbody>${powerTableRows}</tbody>
+    </table>`;
+  } else {
+    html += '<div style="color:var(--text-dim);font-size:12px;padding:8px 0">No power circuits configured.</div>';
+  }
+  html += '</div>';
+
+  // ---- WARNINGS ----
+  let warnings = [];
+  // Unassigned panels
+  let unassignedSignal = 0, unassignedPower = 0;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      if (!grid[r][c].signal) unassignedSignal++;
+      if (!grid[r][c].power) unassignedPower++;
+    }
+  if (unassignedSignal > 0) warnings.push(`${unassignedSignal} of ${totalPanels} panels have no signal assignment`);
+  if (unassignedPower > 0) warnings.push(`${unassignedPower} of ${totalPanels} panels have no power circuit`);
+  state.controllers.forEach(ctrl => {
+    for (let i = 0; i < ctrl.ports; i++) {
+      const usage = getPortUsage(ctrl.id, i);
+      if (usage > ctrl.pixPerPort)
+        warnings.push(`${ctrl.name} Port ${i + 1}: ${usage.toLocaleString()} px exceeds ${ctrl.pixPerPort.toLocaleString()} px capacity`);
+    }
+    const totalCtrlPix = Array.from({ length: ctrl.ports }, (_, i) => getPortUsage(ctrl.id, i)).reduce((a, b) => a + b, 0);
+    if (totalCtrlPix > ctrl.maxPixels)
+      warnings.push(`${ctrl.name}: ${totalCtrlPix.toLocaleString()} total px exceeds ${ctrl.maxPixels.toLocaleString()} max`);
+  });
+  state.powerCircuits.forEach(circ => {
+    const usage = getPowerUsage(circ.id);
+    if (usage > circ.amps * circ.volts)
+      warnings.push(`${circ.name}: ${usage.toLocaleString()}W exceeds ${(circ.amps * circ.volts).toLocaleString()}W breaker capacity`);
+  });
+
+  if (warnings.length) {
+    html += `<div class="report-section"><h3 style="color:var(--warning)">Warnings</h3>`;
+    warnings.forEach(w => {
+      html += `<div style="font-size:12px;padding:4px 0;color:var(--warning)">⚠ ${esc(w)}</div>`;
+    });
+    html += '</div>';
+  }
+
+  area.innerHTML = html;
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('paintView').style.display = tab === 'paint' ? '' : 'none';
+  document.getElementById('utilView').style.display = tab === 'util' ? '' : 'none';
+  document.getElementById('reportView').style.display = tab === 'report' ? '' : 'none';
+  document.getElementById('paintControls').style.display = tab === 'paint' ? 'flex' : 'none';
+  document.getElementById('reportControls').style.display = tab === 'report' ? 'flex' : 'none';
+  if (tab === 'util') renderUtilization();
+  if (tab === 'report') renderReport();
+}
+
+// ============================================================
+// SAVE / LOAD (localStorage)
+// ============================================================
+function saveState() {
+  try {
+    const data = {
+      panels: state.panels,
+      controllers: state.controllers,
+      powerCircuits: state.powerCircuits,
+      screen: state.screen,
+      nextId: nextId,
+    };
+    localStorage.setItem('led-wiring-planner', JSON.stringify(data));
+  } catch (e) { /* quota exceeded or private browsing */ }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem('led-wiring-planner');
+    if (raw) {
+      const s = JSON.parse(raw);
+      state.panels = s.panels || [];
+      state.controllers = s.controllers || [];
+      state.powerCircuits = s.powerCircuits || [];
+      state.screen = s.screen || null;
+      if (s.nextId) nextId = s.nextId;
+      else nextId = Math.max(1,
+        ...state.panels.map(p => p.id + 1),
+        ...state.controllers.map(c => c.id + 1),
+        ...state.powerCircuits.map(p => p.id + 1)
+      );
+    } else {
+      // First load — seed from built-in library
+      PANEL_LIBRARY.forEach(lib => {
+        state.panels.push({ id: gid(), ...lib, _library: true });
+      });
+    }
+  } catch (e) { /* corrupt data, start fresh */ }
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  loadState();
+  renderPanelList();
+  updatePanelSelect();
+  renderControllerList();
+  renderPowerList();
+  if (state.screen) {
+    renderGrid();
+    updateStats();
+  }
+  updateBrushInfo();
+  document.getElementById('screenW').addEventListener('input', updateScreenInfo);
+  document.getElementById('screenH').addEventListener('input', updateScreenInfo);
+}
+
+init();
+</script>
+</body>
+</html>

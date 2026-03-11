@@ -1422,6 +1422,13 @@ function loadState() {
         ...state.controllers.map(c => c.id + 1),
         ...state.powerCircuits.map(p => p.id + 1)
       );
+      // Seed library panels if none exist yet (handles existing localStorage with no panels)
+      if (state.panels.length === 0) {
+        PANEL_LIBRARY.forEach(lib => {
+          state.panels.push({ id: gid(), ...lib, _library: true });
+        });
+        saveState();
+      }
     } else {
       // First load — seed from built-in library
       PANEL_LIBRARY.forEach(lib => {
@@ -1449,16 +1456,6 @@ function esc(s) {
 }
 
 // ============================================================
-// KEYBOARD SHORTCUTS
-// ============================================================
-document.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
-  if (e.key === 's' || e.key === 'S') setPaintMode('signal');
-  if (e.key === 'p' || e.key === 'P') setPaintMode('power');
-  if (e.key === 'e' || e.key === 'E') setPaintMode('erase');
-});
-
-// ============================================================
 // INIT
 // ============================================================
 function init() {
@@ -1474,6 +1471,12 @@ function init() {
   updateBrushInfo();
   document.getElementById('screenW').addEventListener('input', updateScreenInfo);
   document.getElementById('screenH').addEventListener('input', updateScreenInfo);
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 's' || e.key === 'S') setPaintMode('signal');
+    if (e.key === 'p' || e.key === 'P') setPaintMode('power');
+    if (e.key === 'e' || e.key === 'E') setPaintMode('erase');
+  });
 }
 
 init();

@@ -820,12 +820,12 @@ function renderControllerList() {
         </li>`;
     }
     return `
-      <li style="display:block;cursor:default">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <strong>${esc(ctrl.name)}</strong>
+      <li style="display:block;cursor:default;padding:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <strong style="cursor:pointer" onclick="selectSignalBrush(${ctrl.id},0)" title="Click to select Port 1">${esc(ctrl.name)}</strong>
           <button class="small danger" onclick="deleteController(${ctrl.id})">×</button>
         </div>
-        <div style="font-size:11px;color:var(--text-dim)">${ctrl.ports} ports | ${ctrl.pixPerPort.toLocaleString()} px/port | ${ctrl.maxPixels.toLocaleString()} max</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px">${ctrl.ports} ports · ${ctrl.pixPerPort.toLocaleString()} px/port — <em>click a port to paint</em></div>
         <ul class="port-list">${portsHtml}</ul>
       </li>`;
   }).join('');
